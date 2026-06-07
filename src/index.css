@@ -1,0 +1,225 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-holo-blue-light: #33b5e5;
+  --color-holo-blue-dark: #0099cc;
+  --color-holo-blue-dim: #1a3c4a;
+  --color-holo-black: #000000;
+  --color-holo-dark-slate: #060b11;
+  --color-holo-gray-dark: #12161f;
+  --color-holo-gray-light: #202736;
+  --color-holo-gray-border: #2e3a4e;
+  --font-sans: "Roboto", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Roboto", "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --text-main: #ffffff;
+  --text-muted: #d1d5db; /* gray-300 */
+  --text-darker: #9ca3af; /* gray-400 */
+}
+
+.theme-light {
+  --color-holo-blue-dim: #e0f2fe; /* sky-100 */
+  --color-holo-black: #f8fafc; /* slate-50 */
+  --color-holo-dark-slate: #f1f5f9; /* slate-100 */
+  --color-holo-gray-dark: #ffffff; /* white card */
+  --color-holo-gray-light: #f1f5f9; /* slate-100 card alternate */
+  --color-holo-gray-border: #cbd5e1; /* slate-300 border */
+  --text-main: #0f172a; /* slate-900 */
+  --text-muted: #334155; /* slate-700 */
+  --text-darker: #475569; /* slate-600 */
+}
+
+/* Specificity overrides for built-in Tailwind classes in Light Mode */
+.theme-light.bg-holo-black,
+.theme-light .bg-holo-black {
+  background-color: #f8fafc !important;
+}
+.theme-light.bg-holo-gray-dark,
+.theme-light .bg-holo-gray-dark {
+  background-color: #ffffff !important;
+}
+.theme-light.bg-holo-gray-light,
+.theme-light .bg-holo-gray-light {
+  background-color: #f1f5f9 !important;
+}
+.theme-light.border-holo-gray-border,
+.theme-light .border-holo-gray-border {
+  border-color: #cbd5e1 !important;
+}
+.theme-light.bg-black,
+.theme-light .bg-black {
+  background-color: #f1f5f9 !important;
+}
+.theme-light .bg-\[\#111\] {
+  background-color: #ffffff !important;
+}
+.theme-light .bg-\[\#0b0f15\] {
+  background-color: #e2e8f0 !important;
+}
+.theme-light [class*="bg-black/"] {
+  background-color: rgba(226, 232, 240, 0.5) !important;
+}
+
+/* Input and Select elements */
+.theme-light input,
+.theme-light select,
+.theme-light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+.theme-light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Text overrides */
+.theme-light.text-white,
+.theme-light .text-white {
+  color: #0f172a !important;
+}
+.theme-light.text-gray-100,
+.theme-light .text-gray-100 {
+  color: #0f172a !important;
+}
+.theme-light.text-gray-200,
+.theme-light .text-gray-200 {
+  color: #1e293b !important;
+}
+.theme-light.text-gray-300,
+.theme-light .text-gray-300 {
+  color: #334155 !important;
+}
+.theme-light.text-gray-400,
+.theme-light .text-gray-400 {
+  color: #475569 !important;
+}
+.theme-light.text-gray-500,
+.theme-light .text-gray-500 {
+  color: #64748b !important;
+}
+
+/* Blue branding colors readability */
+.theme-light.text-holo-blue-light,
+.theme-light .text-holo-blue-light {
+  color: #0284c7 !important;
+}
+.theme-light.text-holo-blue-dark,
+.theme-light .text-holo-blue-dark {
+  color: #0369a1 !important;
+}
+.theme-light.bg-holo-blue-dim,
+.theme-light .bg-holo-blue-dim {
+  background-color: #e0f2fe !important;
+}
+.theme-light.border-holo-blue-light,
+.theme-light .border-holo-blue-light {
+  border-color: #0284c7 !important;
+}
+.theme-light.border-holo-blue-dark,
+.theme-light .border-holo-blue-dark {
+  border-color: #0369a1 !important;
+}
+
+/* Emerald green readability */
+.theme-light.text-emerald-400,
+.theme-light .text-emerald-400 {
+  color: #15803d !important;
+}
+.theme-light.bg-emerald-950,
+.theme-light .bg-emerald-950 {
+  background-color: #dcfce7 !important;
+}
+.theme-light.border-emerald-500,
+.theme-light .border-emerald-500 {
+  border-color: #22c55e !important;
+}
+
+/* Banner gradients */
+.theme-light [class*="from-holo-blue-dim/30"] {
+  background-image: linear-gradient(to right, rgba(14, 165, 233, 0.15), transparent) !important;
+}
+
+/* Alert/Advice banner overrides in Light Mode */
+.theme-light [class*="bg-red-950"] {
+  background-color: #fee2e2 !important; /* red-100 */
+  border-color: #fca5a5 !important; /* red-300 */
+  color: #991b1b !important; /* red-800 */
+}
+.theme-light [class*="text-red-300"] {
+  color: #991b1b !important;
+}
+.theme-light [class*="bg-emerald-950/40"] {
+  background-color: #dcfce7 !important; /* green-100 */
+  border-color: #86efac !important; /* green-300 */
+  color: #166534 !important; /* green-800 */
+}
+.theme-light [class*="text-emerald-300"] {
+  color: #166534 !important;
+}
+.theme-light [class*="bg-holo-blue-dim/20"] {
+  background-color: #e0f2fe !important; /* sky-100 */
+  border-color: #7dd3fc !important; /* sky-300 */
+  color: #0369a1 !important; /* sky-800 */
+}
+.theme-light [class*="bg-teal-950"] {
+  background-color: #e6fffa !important; /* light teal */
+  border-color: #9bf6e7 !important;
+  color: #0d5a4e !important;
+}
+.theme-light [class*="text-teal-400"] {
+  color: #0d5a4e !important;
+}
+
+/* Authentic Android Holo Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #060b11;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2e3a4e;
+  border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #33b5e5;
+}
+
+/* Holo Focus Highlights */
+.holo-focus:focus {
+  outline: none;
+  border-color: #33b5e5;
+  box-shadow: 0 0 4px #0099cc;
+}
+
+/* Animations of scanlines or classic Holo glow */
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+.holo-scanline {
+  position: relative;
+}
+.holo-scanline::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 2;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+}

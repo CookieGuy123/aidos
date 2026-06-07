@@ -42,6 +42,88 @@ The contents of this repo are **scaffolding**, not a working application. Attend
 - VS Code extensions go in `customizations.vscode.extensions` using their full marketplace IDs (e.g. `esbenp.prettier-vscode`, not just `prettier`).
 - `postCreateCommand` and `postStartCommand` are intentionally identical (the staged-file copy must run on first attach AND on session resume in case the file was deleted). If you edit one, edit the other.
 
+---
+# ---- PROJECT: THE ADMISSIONS ATLAS ----
+# Full-stack scholarship/internship/college-admissions utility built on this template.
+
+## Stack
+- **Frontend**: Vite + React 19 + Tailwind CSS v4 + Lucide icons + Framer Motion
+- **Backend**: Express server (port 3000) with Vite middleware in dev mode
+- **Database/Auth**: Supabase (anon key + service key for admin ops)
+- **AI**: Google Gemini API (`@google/genai`) for scholarship/internship search & resume analysis
+- **Start command**: `npm run dev` → `tsx server.ts` (boots both Express and Vite)
+
+## Architecture
+- `server.ts` — Express server at port 3000. Serves API endpoints, serves static build in prod, Vite middleware in dev.
+- `src/App.tsx` — Main React app with 6 tabs (overview/hub, scholarships, internships, deadlines, calculator, profile). Manages all global state (scholarships, internships, bookmarks, won list, auth, notifications, theme).
+- `src/components/` — One panel per tab: ScholarshipsPanel, InternshipsPanel, DeadlinesPanel, AidCalculatorPanel, ProfilePanel. Plus AuthModal and ResumeScannerModal.
+- `src/data/colleges.ts` — Static college data (14 schools with tuition, aid, deadlines, acceptance rates).
+- `src/types.ts` — TypeScript interfaces: Scholarship, Internship, College, UserPreferences, BookmarkedOpportunity, NotificationItem, UserProfile.
+- `src/supabaseClient.ts` — Supabase client singleton.
+
+## API Endpoints (server.ts)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/scholarships | Return all scholarships from in-memory array |
+| POST | /api/scholarships/update | AI search via Gemini, merges results into array |
+| GET | /api/internships | Return all internships from in-memory array |
+| POST | /api/internships/update | AI search via Gemini, merges results |
+| POST | /api/analyze-resume | Extract profile from resume text, return scored matches |
+| POST | /api/auth/profile | Get user role from Supabase |
+| POST | /api/auth/upgrade-admin | Promote user to admin via secret code |
+| POST | /api/reset | Reset scholarship/internship data to pre-seeded defaults |
+
+## Auth Flow
+- Supabase auth with email/password (login + signup in AuthModal)
+- Anonymous bookmarks stored in `localStorage` under `anon_bookmarks`
+- On login, anon bookmarks sync to server (currently just reads them; cloud table sync is latent)
+- Admin role stored in `user_metadata.role` on Supabase auth user
+- Admin can hit POST /api/reset to wipe AI-added data back to seeds
+
+## Current Seed Data (server.ts defaultScholarships)
+7 scholarships pre-seeded:
+1. **The Gates Scholarship** — $55k/yr, HS senior, deadline 2026-09-15
+2. **Coca-Cola Scholars Program** — $20k, HS senior, deadline 2026-09-30
+3. **SMART Scholarship Program** — $38k/yr + tuition, college STEM, deadline 2026-12-01
+4. **Barry Goldwater Scholarship** — $7.5k/yr, college STEM, deadline 2027-01-30
+5. **Taco Bell Live Más Scholarship** — $25k, ages 16-26, deadline 2027-01-15
+6. **Horatio Alger Career & Technical Scholarship** — $2.5k, college/CTE, Under 35, deadline 2026-06-15
+7. **Horatio Alger National Scholarship** — $25k, HS junior, deadline 2027-03-01
+
+## Design Language: Android Holo (2010s)
+- Dark slate canvas (`bg-holo-gray-dark`, `bg-black`)
+- Electric cyan text accents (`text-holo-blue-light`)
+- Thin crisp borders (`border-holo-gray-border`)
+- Sharp geometric grids, uppercase monospace labels
+- Tailwind theme tokens defined via `@tailwindcss/vite` plugin
+
+## Recent Changes (Session 2026-06-06)
+- **AuthModal fix**: Moved `useRef`/`useEffect` before early `if (!open) return null` to fix React "Rendered more hooks" error
+- **Horatio Alger overhaul**: Split single entry into two real entries (CTE $2.5k + National $25k) with correct deadlines, eligibility, and source URLs
+- **Removed scam demo**: Deleted "Fast-Track Platinum Merit Scholarship" object and the "Audit Safe Mode" toggle UI
+- **Fixed notification**: Replaced fake Taco Bell "June 25" notification with accurate Horatio Alger CTE deadline alert
+- **Fixed age filter bug**: Changed `ageFilter: "Under 35"` to `"All eligible"` because the filter's naive `\d+` extraction parsed "35" as a minimum age requirement, filtering out the scholarship (35 > default ageLimit of 30)
+
+## Server Lifecycle
+- Run: `nohup npx tsx server.ts > /tmp/server.log 2>&1 &` then `disown`
+- Server process does NOT survive shell/logout — must be restarted each session
+- Verify: `curl -s http://localhost:3000/api/scholarships | head -c 100`
+
+## UX Conventions
+- Each scholarship card shows: org, name, amount badge, deadline, level, age limits, field, requirements, scam banner (if flagged)
+- Buttons: bookmark toggle, mark-as-won (with editable dollar amount), external apply link
+- Sorting: soonest deadline, highest award, name A-Z
+- Filtering: target level (all/high_school/college/both), age limit slider
+- Manual entry form for user-tracked scholarships/won awards
+- AI search bar triggers Gemini to find and merge new scholarships
+
+## Env Vars (.env)
+- SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY
+- GEMINI_API_KEY (optional; falls back to seed data)
+- ADMIN_SECRET_CODE (default "ADMIN2026")
+
+---
+
 ## If a project actually needs Docker inside the Codespace
 
 The default Codespace deliberately does NOT install Docker — adding the
