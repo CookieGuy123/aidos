@@ -7,56 +7,60 @@ interface AidCalculatorPanelProps {
   totalScholarshipsWon: number;
 }
 
+const num = (v: string) => parseInt(v) || 0;
+
 export default function AidCalculatorPanel({
   preselectedCollege,
   totalScholarshipsWon
 }: AidCalculatorPanelProps) {
   // Inputs
   const [collegeName, setCollegeName] = useState("Custom Institution");
-  const [stickerPrice, setStickerPrice] = useState<number>(55000);
-  const [scholarshipsVal, setScholarshipsVal] = useState<number>(totalScholarshipsWon);
-  const [projectedGrants, setProjectedGrants] = useState<number>(18000);
-  const [workStudyContribution, setWorkStudyContribution] = useState<number>(3000);
-  const [familyContribution, setFamilyContribution] = useState<number>(5000);
+  const [stickerPrice, setStickerPrice] = useState<string>("");
+  const [scholarshipsVal, setScholarshipsVal] = useState<string>("");
+  const [projectedGrants, setProjectedGrants] = useState<string>("");
+  const [workStudyContribution, setWorkStudyContribution] = useState<string>("");
+  const [familyContribution, setFamilyContribution] = useState<string>("");
   
   // Custom states
-  const [academicYears, setAcademicYears] = useState<number>(4);
-  const [loanInterestRate, setLoanInterestRate] = useState<number>(5.5); // Average federal loan rate
+  const [academicYears, setAcademicYears] = useState<string>("");
+  const [loanInterestRate, setLoanInterestRate] = useState<string>(""); // Average federal loan rate
 
   // Prefill when preselectedCollege changes
   useEffect(() => {
     if (preselectedCollege) {
       setCollegeName(preselectedCollege.name);
-      setStickerPrice(preselectedCollege.tuitionSticker);
-      setProjectedGrants(preselectedCollege.avgAidPackage);
+      setStickerPrice(String(preselectedCollege.tuitionSticker));
+      setProjectedGrants(String(preselectedCollege.avgAidPackage));
     }
   }, [preselectedCollege]);
 
   // Track scholarship changes in real-time
   useEffect(() => {
-    setScholarshipsVal(totalScholarshipsWon);
+    if (totalScholarshipsWon > 0) setScholarshipsVal(String(totalScholarshipsWon));
   }, [totalScholarshipsWon]);
 
+  const sp = num(stickerPrice), sv = num(scholarshipsVal), pg = num(projectedGrants), wsc = num(workStudyContribution), fc = num(familyContribution), ay = num(academicYears), lr = parseFloat(loanInterestRate) || 0;
+
   // Calculations
-  const totalFreeGiftAid = scholarshipsVal + projectedGrants;
+  const totalFreeGiftAid = sv + pg;
   
   // Yearly cost left after scholarships and grants
-  const yearlyNetCost = Math.max(0, stickerPrice - totalFreeGiftAid);
+  const yearlyNetCost = Math.max(0, sp - totalFreeGiftAid);
   
   // Minus work-study and self/family payments to find amount that requires loans
-  const yearlyLoanRequired = Math.max(0, yearlyNetCost - workStudyContribution - familyContribution);
+  const yearlyLoanRequired = Math.max(0, yearlyNetCost - wsc - fc);
 
   // 4 Years (or custom duration) projections
-  const fourYearNetOutOfPocket = yearlyNetCost * academicYears;
+  const fourYearNetOutOfPocket = yearlyNetCost * ay;
   
   // High-fidelity student loan interest calculation
-  const totalLoanPrincipal = yearlyLoanRequired * academicYears;
+  const totalLoanPrincipal = yearlyLoanRequired * ay;
   
   // Approximate standard 10-year monthly loan repayment calculation:
   // r = monthly interest, n = 120 payments
-  const monthlyRate = (loanInterestRate / 100) / 12;
+  const monthlyRate = (lr / 100) / 12;
   const totalPayments = 120;
-  const monthlyPaymentAmt = totalLoanPrincipal > 0 
+  const monthlyPaymentAmt = totalLoanPrincipal > 0 && lr > 0
     ? (totalLoanPrincipal * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments))) / (Math.pow(1 + monthlyRate, totalPayments) - 1)
     : 0;
 
@@ -112,7 +116,7 @@ export default function AidCalculatorPanel({
                 <input
                   type="number"
                   value={stickerPrice}
-                  onChange={(e) => setStickerPrice(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) => setStickerPrice(e.target.value)}
                   className="w-full bg-transparent text-gray-100 text-xs font-sans outline-none border-none"
                 />
               </div>
@@ -133,7 +137,7 @@ export default function AidCalculatorPanel({
                 <input
                   type="number"
                   value={scholarshipsVal}
-                  onChange={(e) => setScholarshipsVal(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) => setScholarshipsVal(e.target.value)}
                   className="w-full bg-transparent text-gray-100 text-xs font-sans outline-none border-none"
                 />
               </div>
@@ -147,7 +151,7 @@ export default function AidCalculatorPanel({
                 <input
                   type="number"
                   value={projectedGrants}
-                  onChange={(e) => setProjectedGrants(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) => setProjectedGrants(e.target.value)}
                   className="w-full bg-transparent text-gray-100 text-xs font-sans outline-none border-none"
                 />
               </div>
@@ -163,7 +167,7 @@ export default function AidCalculatorPanel({
                 <input
                   type="number"
                   value={workStudyContribution}
-                  onChange={(e) => setWorkStudyContribution(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) => setWorkStudyContribution(e.target.value)}
                   className="w-full bg-transparent text-gray-100 text-xs font-sans outline-none border-none"
                 />
               </div>
@@ -177,7 +181,7 @@ export default function AidCalculatorPanel({
                 <input
                   type="number"
                   value={familyContribution}
-                  onChange={(e) => setFamilyContribution(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) => setFamilyContribution(e.target.value)}
                   className="w-full bg-transparent text-gray-100 text-xs font-sans outline-none border-none"
                 />
               </div>
@@ -188,7 +192,7 @@ export default function AidCalculatorPanel({
               <label className="text-xs text-gray-400 uppercase block mb-1">Academic Duration</label>
               <select
                 value={academicYears}
-                onChange={(e) => setAcademicYears(Number(e.target.value))}
+                onChange={(e) => setAcademicYears(e.target.value)}
                 className="w-full bg-black text-gray-200 border border-holo-gray-border p-1 text-xs font-sans focus:border-holo-blue-light outline-none"
               >
                 <option value={4}>4 Years (Undergraduate)</option>
@@ -201,7 +205,7 @@ export default function AidCalculatorPanel({
 
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className="text-xs text-gray-400 uppercase">Estimated Loan Interest Rate ({loanInterestRate}%)</label>
+               <label className="text-xs text-gray-400 uppercase">Estimated Loan Interest Rate ({loanInterestRate || "0"}%)</label>
             </div>
             <input
               type="range"
@@ -209,7 +213,7 @@ export default function AidCalculatorPanel({
               max="12"
               step="0.1"
               value={loanInterestRate}
-              onChange={(e) => setLoanInterestRate(Number(e.target.value))}
+              onChange={(e) => setLoanInterestRate(e.target.value)}
               className="w-full accent-holo-blue-light h-1 bg-black outline-none border border-holo-gray-border cursor-pointer animate-none"
             />
           </div>
@@ -287,6 +291,10 @@ export default function AidCalculatorPanel({
                 <div className="flex justify-between">
                   <span>Standard 10-Year Payment:</span>
                   <span className="text-white font-bold">${Math.round(monthlyPaymentAmt)}/mo</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Repaid (10 yr):</span>
+                  <span className="text-white font-bold">${Math.round(totalRepaidOver10Yrs).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Estimated Interest Accrued:</span>

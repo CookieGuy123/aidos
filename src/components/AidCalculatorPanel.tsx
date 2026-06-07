@@ -2,25 +2,27 @@ import React, { useState, useEffect } from "react";
 import { Calculator, DollarSign, AlertTriangle, BarChart3, Clock } from "lucide-react";
 import { collegesData } from "../data/colleges";
 
+const n = (v: string) => parseInt(v) || 0;
+
 interface Props {
   initialCollege?: any;
 }
 
 export default function AidCalculatorPanel({ initialCollege }: Props) {
   const [collegeName, setCollegeName] = useState("");
-  const [tuition, setTuition] = useState(40000);
-  const [scholarships, setScholarships] = useState(5000);
-  const [grants, setGrants] = useState(3000);
-  const [workStudy, setWorkStudy] = useState(2000);
-  const [familyContribution, setFamilyContribution] = useState(10000);
-  const [years, setYears] = useState(4);
-  const [interestRate, setInterestRate] = useState(5.5);
+  const [tuition, setTuition] = useState("");
+  const [scholarships, setScholarships] = useState("");
+  const [grants, setGrants] = useState("");
+  const [workStudy, setWorkStudy] = useState("");
+  const [familyContribution, setFamilyContribution] = useState("");
+  const [years, setYears] = useState("");
+  const [interestRate, setInterestRate] = useState("");
   const [loadedCollege, setLoadedCollege] = useState<any>(null);
 
   useEffect(() => {
     if (initialCollege) {
       setCollegeName(initialCollege.name);
-      setTuition(initialCollege.tuitionSticker);
+      setTuition(String(initialCollege.tuitionSticker));
       setLoadedCollege(initialCollege);
     }
   }, [initialCollege]);
@@ -29,25 +31,27 @@ export default function AidCalculatorPanel({ initialCollege }: Props) {
     const found = collegesData.find(c => c.name.toLowerCase().includes(name.toLowerCase()));
     if (found) {
       setCollegeName(found.name);
-      setTuition(found.tuitionSticker);
+      setTuition(String(found.tuitionSticker));
       setLoadedCollege(found);
     }
   };
 
-  const netCost = tuition - scholarships - grants - workStudy;
-  const remainingAfterFamily = Math.max(0, netCost - familyContribution);
-  const monthlyPayment = remainingAfterFamily > 0
-    ? (remainingAfterFamily * (interestRate / 100 / 12) * Math.pow(1 + interestRate / 100 / 12, years * 12)) / (Math.pow(1 + interestRate / 100 / 12, years * 12) - 1)
+  const t = n(tuition), s = n(scholarships), g = n(grants), w = n(workStudy), f = n(familyContribution), y = n(years), r = parseFloat(interestRate) || 0;
+  const netCost = t - s - g - w;
+  const remainingAfterFamily = Math.max(0, netCost - f);
+  const totalLoanPrincipal = remainingAfterFamily * y;
+  const monthlyPayment = totalLoanPrincipal > 0 && r > 0
+    ? (totalLoanPrincipal * (r / 100 / 12) * Math.pow(1 + r / 100 / 12, 120)) / (Math.pow(1 + r / 100 / 12, 120) - 1)
     : 0;
-  const totalRepaid = monthlyPayment * years * 12;
-  const totalInterest = totalRepaid - remainingAfterFamily;
+  const totalRepaid = monthlyPayment * 120;
+  const totalInterest = Math.max(0, totalRepaid - totalLoanPrincipal);
 
-  const maxBar = Math.max(tuition, 1);
+  const maxBar = Math.max(t, 1);
   const segments = [
-    { label: "Scholarships", value: scholarships, color: "bg-primary" },
-    { label: "Grants", value: grants, color: "bg-secondary" },
-    { label: "Work-Study", value: workStudy, color: "bg-tertiary" },
-    { label: "Family", value: familyContribution, color: "bg-on-surface-variant" },
+    { label: "Scholarships", value: s, color: "bg-primary" },
+    { label: "Grants", value: g, color: "bg-secondary" },
+    { label: "Work-Study", value: w, color: "bg-tertiary" },
+    { label: "Family", value: f, color: "bg-on-surface-variant" },
     { label: "Borrowing", value: remainingAfterFamily, color: "bg-error" },
   ];
 
@@ -82,7 +86,7 @@ export default function AidCalculatorPanel({ initialCollege }: Props) {
             ].map(f => (
               <div key={f.label}>
                 <label className="block text-sm font-medium text-on-surface mb-1">{f.label}</label>
-                <input type="number" value={f.value} onChange={e => f.set(parseInt(e.target.value) || 0)} className="m3-field w-full" />
+                <input type="number" value={f.value} onChange={e => f.set(e.target.value)} className="m3-field w-full" />
               </div>
             ))}
           </div>
@@ -90,17 +94,17 @@ export default function AidCalculatorPanel({ initialCollege }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-on-surface mb-1">Family Contribution</label>
-              <input type="number" value={familyContribution} onChange={e => setFamilyContribution(parseInt(e.target.value) || 0)} className="m3-field w-full" />
+              <input type="number" value={familyContribution} onChange={e => setFamilyContribution(e.target.value)} className="m3-field w-full" />
             </div>
             <div>
               <label className="block text-sm font-medium text-on-surface mb-1">Loan Years</label>
-              <input type="number" min={1} max={10} value={years} onChange={e => setYears(parseInt(e.target.value) || 4)} className="m3-field w-full" />
+              <input type="number" min={1} max={10} value={years} onChange={e => setYears(e.target.value)} className="m3-field w-full" />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-on-surface mb-1">Interest Rate: {interestRate}%</label>
-            <input type="range" min={0} max={15} step={0.5} value={interestRate} onChange={e => setInterestRate(parseFloat(e.target.value))}
+            <label className="block text-sm font-medium text-on-surface mb-1">Interest Rate: {interestRate || "0"}%</label>
+            <input type="range" min={0} max={15} step={0.5} value={interestRate} onChange={e => setInterestRate(e.target.value)}
               className="w-full accent-primary" />
             <div className="flex justify-between text-xs text-on-surface-variant mt-0.5">
               <span>0%</span><span>5%</span><span>10%</span><span>15%</span>
@@ -142,8 +146,8 @@ export default function AidCalculatorPanel({ initialCollege }: Props) {
 
           <div className="border-t border-surface-dim pt-3 space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-on-surface-variant">Annual borrowing</span>
-              <span className="font-mono tabular-nums font-semibold text-error">${remainingAfterFamily.toLocaleString()}</span>
+              <span className="text-on-surface-variant">Total loans (all years)</span>
+              <span className="font-mono tabular-nums font-semibold text-error">${totalLoanPrincipal.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-on-surface-variant">Monthly payment</span>
@@ -161,13 +165,13 @@ export default function AidCalculatorPanel({ initialCollege }: Props) {
             </div>
           </div>
 
-          {remainingAfterFamily > tuition * 0.5 && (
+          {remainingAfterFamily > t * 0.5 && (
             <div className="flex items-start gap-2 p-3 bg-error-container rounded-xl text-sm text-on-error-container">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>High borrowing. Consider more scholarships or a lower-cost school.</span>
             </div>
           )}
-          {interestRate >= 10 && (
+          {r >= 10 && (
             <div className="flex items-start gap-2 p-3 bg-warning-container rounded-xl text-sm text-warning">
               <Clock className="w-4 h-4 shrink-0 mt-0.5" />
               <span>Rate above 10%. Explore federal loan options.</span>

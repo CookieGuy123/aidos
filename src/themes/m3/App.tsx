@@ -7,10 +7,12 @@ import DeadlinesPanel from "./components/DeadlinesPanel";
 import AidCalculatorPanel from "./components/AidCalculatorPanel";
 import ProfilePanel from "./components/ProfilePanel";
 import AuthModal from "./components/AuthModal";
-import { Search, Bookmark, Award, Bell, School, Briefcase, Calendar, Calculator, User, LogIn, LogOut, Home, Trophy, Layers, Clock, DollarSign, Shield, Sparkles, X, Sun, Moon, Maximize2, Minimize2, Loader2, Upload } from "lucide-react";
+import ResumeScannerModal from "./components/ResumeScannerModal";
+import AdminPanel from "../../components/AdminPanel";
+import { Search, Bookmark, Award, Bell, School, Briefcase, Calendar, Calculator, User, LogIn, LogOut, Home, Trophy, Layers, Clock, DollarSign, Shield, Sparkles, X, Sun, Moon, Maximize2, Minimize2, Loader2, Upload, ShieldCheck } from "lucide-react";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"overview" | "scholarships" | "internships" | "deadlines" | "calculator" | "profile">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "scholarships" | "internships" | "deadlines" | "calculator" | "profile" | "admin">("overview");
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
   const [internships, setInternships] = useState<Internship[]>([]);
   const [bookmarked, setBookmarked] = useState<BookmarkedOpportunity[]>([]);
@@ -37,6 +39,7 @@ export default function App() {
   const resolvedGradient = gradient === "none" ? "none" : gradientDir === "bottom" ? `${gradient}-bot` : gradient;
   const [authOpen, setAuthOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [scanData, setScanData] = useState<any>(null);
   const [aiSearchOpen, setAiSearchOpen] = useState(false);
   const [aiSearchQuery, setAiSearchQuery] = useState("");
   const [aiSearchLoading, setAiSearchLoading] = useState(false);
@@ -172,6 +175,7 @@ export default function App() {
     { id: "deadlines", label: "Deadlines", icon: Calendar },
     { id: "calculator", label: "Costs", icon: Calculator },
     { id: "profile", label: "Profile", icon: User },
+    ...(user?.user_metadata?.role === "admin" ? [{ id: "admin", label: "Admin", icon: ShieldCheck }] : []),
   ];
 
   return (
@@ -360,6 +364,8 @@ export default function App() {
           <DeadlinesPanel onSelectCollege={handleSelectCollegeForCalc} />
         ) : activeTab === "calculator" ? (
           <AidCalculatorPanel initialCollege={selectedCollege} />
+        ) : activeTab === "admin" ? (
+          <AdminPanel userId={user?.id} />
         ) : (
           <ProfilePanel
             user={user}
@@ -398,20 +404,8 @@ export default function App() {
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} onAuthSuccess={() => setAuthOpen(false)} />
 
       {scanOpen && (
-        <div className="m3-dialog-overlay" onClick={() => setScanOpen(false)}>
-          <div className="m3-dialog" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 pt-5 pb-2">
-              <h2 className="text-xl font-semibold text-on-surface">Resume Scanner</h2>
-              <button onClick={() => setScanOpen(false)} className="m3-btn-text p-2"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="px-6 pb-6">
-              <p className="text-sm text-on-surface-variant mb-4">Drop a resume to match against opportunities.</p>
-              <div className="border-2 border-dashed border-outline-variant rounded-xl p-8 text-center">
-                <p className="text-sm text-on-surface-variant">Scanner ready</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ResumeScannerModal onClose={() => { setScanOpen(false); setScanData(null); }}
+          onData={setScanData} data={scanData} />
       )}
     </div>
   );

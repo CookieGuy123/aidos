@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Search, Bookmark, Award, ExternalLink, Plus, Sparkles, X } from "lucide-react";
+import { Search, Bookmark, Award, ExternalLink, Plus, Sparkles, X, ArrowUpDown, RotateCcw } from "lucide-react";
 import type { Scholarship, Internship, UserProfile } from "../../../types";
 
 const levelLabels: Record<string, string> = { high_school: "High School", college: "College", both: "Both", graduate: "Graduate" };
@@ -17,12 +17,40 @@ interface Props {
   onOpenAiSearch: () => void;
 }
 
+function fmtDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-");
+  const date = new Date(+y, +m - 1, +d);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+}
+
 export default function ScholarshipsPanel({ scholarships, setScholarships, isBookmarked, toggleBookmark, isWon, toggleWon, dismissNew, saveData, profile, onOpenAiSearch }: Props) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"deadline" | "amount" | "name">("deadline");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [levelFilter, setLevelFilter] = useState("all");
   const [manualOpen, setManualOpen] = useState(false);
   const [manual, setManual] = useState({ name: "", organization: "", amountNumeric: "", deadline: "", studentLevel: "high_school" });
+
+  const handleSort = (field: "deadline" | "amount" | "name") => {
+    if (sortBy === field) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(field);
+      setSortDir(field === "amount" ? "desc" : "asc");
+    }
+  };
+
+  const resetFilters = () => {
+    setSearch("");
+    setLevelFilter("all");
+    setSortBy("deadline");
+    setSortDir("asc");
+  };
+
+  const sortArrow = (field: "deadline" | "amount" | "name") => {
+    if (sortBy !== field) return null;
+    return <ArrowUpDown className={`w-3 h-3 inline ml-1 ${sortDir === "desc" ? "rotate-180" : ""}`} />;
+  };
 
   const filtered = scholarships
     .filter(s => {
@@ -32,9 +60,10 @@ export default function ScholarshipsPanel({ scholarships, setScholarships, isBoo
       return s.name.toLowerCase().includes(q) || s.organization.toLowerCase().includes(q) || (s.fieldOfStudy || "").toLowerCase().includes(q);
     })
     .sort((a, b) => {
-      if (sortBy === "deadline") return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      if (sortBy === "amount") return (b.amountNumeric || 0) - (a.amountNumeric || 0);
-      return a.name.localeCompare(b.name);
+      const cmp = sortBy === "deadline" ? new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+        : sortBy === "amount" ? (a.amountNumeric || 0) - (b.amountNumeric || 0)
+        : a.name.localeCompare(b.name);
+      return sortDir === "asc" ? cmp : -cmp;
     });
 
   const addManual = () => {
@@ -72,11 +101,10 @@ export default function ScholarshipsPanel({ scholarships, setScholarships, isBoo
             <option value="graduate">Graduate</option>
             <option value="both">Both</option>
           </select>
-          <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="m3-select">
-            <option value="deadline">Deadline</option>
-            <option value="amount">Amount</option>
-            <option value="name">Name</option>
-          </select>
+          <span className="text-xs text-on-surface-variant hidden sm:inline">Click headers to sort</span>
+          <button onClick={resetFilters} className="m3-btn-text p-1.5 text-on-surface-variant hover:text-primary" title="Reset all filters">
+            <RotateCcw className="w-4 h-4" />
+          </button>
           <button onClick={onOpenAiSearch} className="m3-btn-filled text-sm px-4 py-2">
             <Sparkles className="w-4 h-4" /> AI Search
           </button>
@@ -110,9 +138,9 @@ export default function ScholarshipsPanel({ scholarships, setScholarships, isBoo
           <thead>
             <tr>
               <th>Organization</th>
-              <th>Name</th>
-              <th className="text-right">Amount</th>
-              <th>Deadline</th>
+              <th onClick={() => handleSort("name")} className="cursor-pointer select-none">Name{sortArrow("name")}</th>
+              <th onClick={() => handleSort("amount")} className="text-right cursor-pointer select-none">Amount{sortArrow("amount")}</th>
+              <th onClick={() => handleSort("deadline")} className="cursor-pointer select-none">Deadline{sortArrow("deadline")}</th>
               <th>Level</th>
               <th>Field</th>
               <th className="text-right">Actions</th>
@@ -130,24 +158,27 @@ export default function ScholarshipsPanel({ scholarships, setScholarships, isBoo
                 </td>
                 <td className="text-right font-mono tabular-nums font-semibold">${(s.amountNumeric || 0).toLocaleString()}</td>
                 <td className="font-mono tabular-nums text-sm">
-                  {new Date(s.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" })}
+                  {fmtDate(s.deadline)}
                 </td>
                 <td className="text-sm text-on-surface-variant">{levelLabels[s.studentLevel] || s.studentLevel}</td>
                 <td className="text-sm text-on-surface-variant">{s.fieldOfStudy || "—"}</td>
-                <td className="text-right">
-                  <div className="flex items-center justify-end gap-0.5">
+                <td>
+                  <div className="flex items-center gap-0.5">
                     <button onClick={() => toggleBookmark(s.id, "scholarship")} title={isBookmarked(s.id) ? "Remove bookmark" : "Bookmark"}
-                      className={`m3-btn-text p-1.5 ${isBookmarked(s.id) ? "text-primary" : "text-on-surface-variant"}`}>
+                      className={`m3-btn-text p-1.5 flex items-center gap-1 ${isBookmarked(s.id) ? "text-primary" : "text-on-surface-variant"}`}>
                       <Bookmark className={`w-4 h-4 ${isBookmarked(s.id) ? "fill-primary" : ""}`} />
+                      <span className="text-[10px] leading-none hidden md:inline">{isBookmarked(s.id) ? "Saved" : "Save"}</span>
                     </button>
                     <button onClick={() => toggleWon(s, "scholarship")} title={isWon(s.id) ? "Remove award" : "Mark as won"}
-                      className={`m3-btn-text p-1.5 ${isWon(s.id) ? "text-secondary" : "text-on-surface-variant"}`}>
+                      className={`m3-btn-text p-1.5 flex items-center gap-1 ${isWon(s.id) ? "text-secondary" : "text-on-surface-variant"}`}>
                       <Award className={`w-4 h-4 ${isWon(s.id) ? "text-secondary" : ""}`} />
+                      <span className="text-[10px] leading-none hidden md:inline">{isWon(s.id) ? "Won" : "Award"}</span>
                     </button>
                     {s.sourceUrl && (
                       <a href={s.sourceUrl} target="_blank" rel="noreferrer" title="Open website"
-                        className="m3-btn-text p-1.5 text-on-surface-variant">
+                        className="m3-btn-text p-1.5 flex items-center gap-1 text-on-surface-variant">
                         <ExternalLink className="w-4 h-4" />
+                        <span className="text-[10px] leading-none hidden md:inline">Visit</span>
                       </a>
                     )}
                   </div>

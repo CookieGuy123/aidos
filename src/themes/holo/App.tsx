@@ -7,6 +7,7 @@ import AidCalculatorPanel from "./components/AidCalculatorPanel";
 import ProfilePanel from "./components/ProfilePanel";
 import AuthModal from "./components/AuthModal";
 import ResumeScannerModal from "./components/ResumeScannerModal";
+import AdminPanel from "./components/AdminPanel";
 import { supabase } from "../../supabaseClient";
 import { 
   Trophy, Bookmark, Clock, Calendar, ShieldCheck, 
@@ -16,7 +17,7 @@ import {
 } from "lucide-react";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"overview" | "scholarships" | "internships" | "deadlines" | "calculator" | "profile">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "scholarships" | "internships" | "deadlines" | "calculator" | "profile" | "admin">("overview");
   
   // Theme & Preferences State
   const [theme, setTheme] = useState<"dark" | "light">(() => (localStorage.getItem("theme") as "dark" | "light") || "dark");
@@ -665,6 +666,18 @@ export default function App() {
         >
           Profile
         </button>
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab("admin")}
+            className={`flex-1 py-3 text-center border-b-2 text-xs font-semibold tracking-tight transition-all cursor-pointer ${
+              activeTab === "admin"
+                ? "border-holo-blue-light text-holo-blue-light bg-holo-blue-dim/10 font-bold"
+                : "border-transparent text-gray-400 hover:text-holo-blue-light"
+            }`}
+          >
+            Admin
+          </button>
+        )}
       </nav>
 
       {/* Main Content Area */}
@@ -968,6 +981,11 @@ export default function App() {
                 preselectedCollege={selectedCollege}
                 totalScholarshipsWon={totalWonTotalValue}
               />
+            )}
+
+            {/* 7. Admin Panel */}
+            {activeTab === "admin" && isAdmin && (
+              <AdminPanel userId={session?.user?.id} />
             )}
 
             {/* 6. Profile Panel */}

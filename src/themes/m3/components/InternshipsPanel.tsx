@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Search, Bookmark, Award, ExternalLink, Plus, Sparkles, X } from "lucide-react";
+import { Search, Bookmark, Award, ExternalLink, Plus, Sparkles, X, ArrowUpDown, RotateCcw } from "lucide-react";
 import type { Internship, Scholarship, UserProfile } from "../../../types";
 
 interface Props {
@@ -15,12 +15,40 @@ interface Props {
   onOpenAiSearch: () => void;
 }
 
+function fmtDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-");
+  const date = new Date(+y, +m - 1, +d);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+}
+
 export default function InternshipsPanel({ internships, setInternships, isBookmarked, toggleBookmark, isWon, toggleWon, dismissNew, saveData, profile, onOpenAiSearch }: Props) {
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<"deadline" | "title">("deadline");
+  const [sortBy, setSortBy] = useState<"deadline" | "title" | "company">("deadline");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [typeFilter, setTypeFilter] = useState<"all" | "Paid" | "Unpaid">("all");
   const [manualOpen, setManualOpen] = useState(false);
   const [manual, setManual] = useState({ title: "", company: "", location: "", type: "Paid" as "Paid" | "Unpaid", deadline: "" });
+
+  const handleSort = (field: "deadline" | "title" | "company") => {
+    if (sortBy === field) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(field);
+      setSortDir(field === "deadline" ? "asc" : "asc");
+    }
+  };
+
+  const resetFilters = () => {
+    setSearch("");
+    setTypeFilter("all");
+    setSortBy("deadline");
+    setSortDir("asc");
+  };
+
+  const sortArrow = (field: "deadline" | "title" | "company") => {
+    if (sortBy !== field) return null;
+    return <ArrowUpDown className={`w-3 h-3 inline ml-1 ${sortDir === "desc" ? "rotate-180" : ""}`} />;
+  };
 
   const filtered = internships
     .filter(i => {
@@ -30,8 +58,10 @@ export default function InternshipsPanel({ internships, setInternships, isBookma
       return i.title.toLowerCase().includes(q) || i.company.toLowerCase().includes(q) || (i.fieldOfStudy || "").toLowerCase().includes(q) || (i.location || "").toLowerCase().includes(q);
     })
     .sort((a, b) => {
-      if (sortBy === "deadline") return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      return a.title.localeCompare(b.title);
+      const cmp = sortBy === "deadline" ? new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+        : sortBy === "title" ? a.title.localeCompare(b.title)
+        : a.company.localeCompare(b.company);
+      return sortDir === "asc" ? cmp : -cmp;
     });
 
   const addManual = () => {
@@ -65,10 +95,10 @@ export default function InternshipsPanel({ internships, setInternships, isBookma
             <option value="Paid">Paid</option>
             <option value="Unpaid">Unpaid</option>
           </select>
-          <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="m3-select">
-            <option value="deadline">Deadline</option>
-            <option value="title">Title</option>
-          </select>
+          <span className="text-xs text-on-surface-variant hidden sm:inline">Click headers to sort</span>
+          <button onClick={resetFilters} className="m3-btn-text p-1.5 text-on-surface-variant hover:text-primary" title="Reset all filters">
+            <RotateCcw className="w-4 h-4" />
+          </button>
           <button onClick={onOpenAiSearch} className="m3-btn-filled text-sm px-4 py-2">
             <Sparkles className="w-4 h-4" /> AI Search
           </button>
@@ -102,11 +132,11 @@ export default function InternshipsPanel({ internships, setInternships, isBookma
         <table className="m3-table">
           <thead>
             <tr>
-              <th>Company</th>
-              <th>Title</th>
+              <th onClick={() => handleSort("company")} className="cursor-pointer select-none">Company{sortArrow("company")}</th>
+              <th onClick={() => handleSort("title")} className="cursor-pointer select-none">Title{sortArrow("title")}</th>
               <th>Location</th>
               <th>Type</th>
-              <th>Deadline</th>
+              <th onClick={() => handleSort("deadline")} className="cursor-pointer select-none">Deadline{sortArrow("deadline")}</th>
               <th>Field</th>
               <th className="text-right">Actions</th>
             </tr>
@@ -128,23 +158,26 @@ export default function InternshipsPanel({ internships, setInternships, isBookma
                   }`}>{i.type}</span>
                 </td>
                 <td className="font-mono tabular-nums text-sm">
-                  {new Date(i.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" })}
+                  {fmtDate(i.deadline)}
                 </td>
                 <td className="text-sm text-on-surface-variant">{i.fieldOfStudy || "—"}</td>
-                <td className="text-right">
-                  <div className="flex items-center justify-end gap-0.5">
+                <td>
+                  <div className="flex items-center gap-0.5">
                     <button onClick={() => toggleBookmark(i.id, "internship")} title={isBookmarked(i.id) ? "Remove bookmark" : "Bookmark"}
-                      className={`m3-btn-text p-1.5 ${isBookmarked(i.id) ? "text-primary" : "text-on-surface-variant"}`}>
+                      className={`m3-btn-text p-1.5 flex items-center gap-1 ${isBookmarked(i.id) ? "text-primary" : "text-on-surface-variant"}`}>
                       <Bookmark className={`w-4 h-4 ${isBookmarked(i.id) ? "fill-primary" : ""}`} />
+                      <span className="text-[10px] leading-none hidden md:inline">{isBookmarked(i.id) ? "Saved" : "Save"}</span>
                     </button>
                     <button onClick={() => toggleWon(i, "internship")} title={isWon(i.id) ? "Remove award" : "Mark as won"}
-                      className={`m3-btn-text p-1.5 ${isWon(i.id) ? "text-secondary" : "text-on-surface-variant"}`}>
+                      className={`m3-btn-text p-1.5 flex items-center gap-1 ${isWon(i.id) ? "text-secondary" : "text-on-surface-variant"}`}>
                       <Award className={`w-4 h-4 ${isWon(i.id) ? "text-secondary" : ""}`} />
+                      <span className="text-[10px] leading-none hidden md:inline">{isWon(i.id) ? "Won" : "Award"}</span>
                     </button>
                     {i.sourceUrl && (
                       <a href={i.sourceUrl} target="_blank" rel="noreferrer" title="Open website"
-                        className="m3-btn-text p-1.5 text-on-surface-variant">
+                        className="m3-btn-text p-1.5 flex items-center gap-1 text-on-surface-variant">
                         <ExternalLink className="w-4 h-4" />
+                        <span className="text-[10px] leading-none hidden md:inline">Visit</span>
                       </a>
                     )}
                   </div>

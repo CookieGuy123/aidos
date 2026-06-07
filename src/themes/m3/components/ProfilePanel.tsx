@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { User, Bookmark, Award, RotateCcw, Edit3, Palette, Sun, Moon, Maximize2, Minimize2, Shield, ArrowUp, ArrowDown } from "lucide-react";
 import type { UserProfile, UserPreferences, Scholarship, Internship, BookmarkedOpportunity } from "../../../types";
+import { supabase } from "../../../supabaseClient";
 
 interface Props {
   user: any;
@@ -39,8 +40,8 @@ export default function ProfilePanel({ user, profile, setProfile, preferences, s
       if (data.profile) {
         setProfile(data.profile);
         setAdminCode("");
+        await supabase.auth.refreshSession();
         alert("Upgraded to admin!");
-        window.location.reload();
       } else {
         alert(data.error || "Upgrade failed");
       }
