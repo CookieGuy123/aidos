@@ -2,7 +2,51 @@
   "hash": "b288db20",
   "configHash": "4f065ecb",
   "lockfileHash": "527763e8",
-  "browserHash": "344cd984",
-  "optimized": {},
-  "chunks": {}
+  "browserHash": "3a21f2f0",
+  "optimized": {
+    "react/jsx-dev-runtime": {
+      "src": "../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "086f1e45",
+      "needsInterop": true
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "2d927fd6",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "e69af4c2",
+      "needsInterop": true
+    },
+    "lucide-react": {
+      "src": "../../node_modules/lucide-react/dist/esm/lucide-react.js",
+      "file": "lucide-react.js",
+      "fileHash": "bff5d7d9",
+      "needsInterop": false
+    },
+    "pdfjs-dist": {
+      "src": "../../node_modules/pdfjs-dist/build/pdf.mjs",
+      "file": "pdfjs-dist.js",
+      "fileHash": "dea53f2f",
+      "needsInterop": false
+    },
+    "@supabase/supabase-js": {
+      "src": "../../node_modules/@supabase/supabase-js/dist/index.mjs",
+      "file": "@supabase_supabase-js.js",
+      "fileHash": "5e2d264f",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-SLLED36W": {
+      "file": "chunk-SLLED36W.js"
+    },
+    "chunk-WOOG5QLI": {
+      "file": "chunk-WOOG5QLI.js"
+    }
+  }
 }
