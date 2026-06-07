@@ -1,0 +1,172 @@
+import React, { useState } from "react";
+import { Search, Bookmark, Award, ExternalLink, Plus, Sparkles, X } from "lucide-react";
+import type { Scholarship, Internship, UserProfile } from "../../../types";
+
+const levelLabels: Record<string, string> = { high_school: "High School", college: "College", both: "Both", graduate: "Graduate" };
+
+interface Props {
+  scholarships: Scholarship[];
+  setScholarships: React.Dispatch<React.SetStateAction<Scholarship[]>>;
+  isBookmarked: (id: string) => boolean;
+  toggleBookmark: (id: string, type: "scholarship" | "internship") => void;
+  isWon: (id: string) => boolean;
+  toggleWon: (item: Scholarship | Internship, type: "scholarship" | "internship") => void;
+  dismissNew: (id: string) => void;
+  saveData: (overrides?: Record<string, any>) => void;
+  profile: UserProfile | null;
+  onOpenAiSearch: () => void;
+}
+
+export default function ScholarshipsPanel({ scholarships, setScholarships, isBookmarked, toggleBookmark, isWon, toggleWon, dismissNew, saveData, profile, onOpenAiSearch }: Props) {
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"deadline" | "amount" | "name">("deadline");
+  const [levelFilter, setLevelFilter] = useState("all");
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manual, setManual] = useState({ name: "", organization: "", amountNumeric: "", deadline: "", studentLevel: "high_school" });
+
+  const filtered = scholarships
+    .filter(s => {
+      if (levelFilter !== "all" && s.studentLevel !== levelFilter && s.studentLevel !== "both") return false;
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return s.name.toLowerCase().includes(q) || s.organization.toLowerCase().includes(q) || (s.fieldOfStudy || "").toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      if (sortBy === "deadline") return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+      if (sortBy === "amount") return (b.amountNumeric || 0) - (a.amountNumeric || 0);
+      return a.name.localeCompare(b.name);
+    });
+
+  const addManual = () => {
+    if (!manual.name || !manual.organization || !manual.amountNumeric || !manual.deadline) return;
+    const id = "manual-" + Date.now();
+    const s: Scholarship = {
+      id, name: manual.name, organization: manual.organization,
+      amountNumeric: parseInt(manual.amountNumeric) || 0,
+      amount: `$${parseInt(manual.amountNumeric).toLocaleString()}`,
+      deadline: manual.deadline, studentLevel: manual.studentLevel as any,
+      sourceUrl: "", isNew: false,
+      isFree: true, scamFlag: false, scamReason: "", ageFilter: "All eligible",
+      requirements: [], isVerified: true, fieldOfStudy: "",
+    };
+    setScholarships(prev => [s, ...prev]);
+    setManual({ name: "", organization: "", amountNumeric: "", deadline: "", studentLevel: "high_school" });
+    setManualOpen(false);
+    setTimeout(() => saveData(), 100);
+  };
+
+  return (
+    <div>
+      {/* Toolbar */}
+      <div className="m3-card p-3 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex-1 min-w-[240px] relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              className="m3-field w-full pl-9" placeholder="Filter scholarships by name, org, or field..." />
+          </div>
+          <select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} className="m3-select">
+            <option value="all">All levels</option>
+            <option value="high_school">High school</option>
+            <option value="college">College</option>
+            <option value="graduate">Graduate</option>
+            <option value="both">Both</option>
+          </select>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="m3-select">
+            <option value="deadline">Deadline</option>
+            <option value="amount">Amount</option>
+            <option value="name">Name</option>
+          </select>
+          <button onClick={onOpenAiSearch} className="m3-btn-filled text-sm px-4 py-2">
+            <Sparkles className="w-4 h-4" /> AI Search
+          </button>
+          <button onClick={() => setManualOpen(!manualOpen)} className="m3-btn-outlined text-sm px-4 py-2">
+            <Plus className="w-4 h-4" /> Add
+          </button>
+        </div>
+      </div>
+
+      {manualOpen && (
+        <div className="m3-card p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-on-surface">Add Scholarship</h3>
+            <button onClick={() => setManualOpen(false)} className="m3-btn-text p-1"><X className="w-4 h-4" /></button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <input value={manual.name} onChange={e => setManual(m => ({ ...m, name: e.target.value }))} className="m3-field" placeholder="Name" />
+            <input value={manual.organization} onChange={e => setManual(m => ({ ...m, organization: e.target.value }))} className="m3-field" placeholder="Org" />
+            <input value={manual.amountNumeric} onChange={e => setManual(m => ({ ...m, amountNumeric: e.target.value }))} className="m3-field" placeholder="$ Amount" type="number" />
+            <div className="flex gap-2">
+              <input value={manual.deadline} onChange={e => setManual(m => ({ ...m, deadline: e.target.value }))} className="m3-field flex-1" type="date" />
+              <button onClick={addManual} className="m3-btn-filled text-sm px-4">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="m3-card overflow-x-auto">
+        <table className="m3-table">
+          <thead>
+            <tr>
+              <th>Organization</th>
+              <th>Name</th>
+              <th className="text-right">Amount</th>
+              <th>Deadline</th>
+              <th>Level</th>
+              <th>Field</th>
+              <th className="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(s => (
+              <tr key={s.id}>
+                <td className="text-sm text-on-surface-variant">{s.organization}</td>
+                <td className="font-medium">
+                  <div className="flex items-center gap-2">
+                    {s.name}
+                    {s.isNew && <span className="m3-badge m3-badge-new">NEW</span>}
+                  </div>
+                </td>
+                <td className="text-right font-mono tabular-nums font-semibold">${(s.amountNumeric || 0).toLocaleString()}</td>
+                <td className="font-mono tabular-nums text-sm">
+                  {new Date(s.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" })}
+                </td>
+                <td className="text-sm text-on-surface-variant">{levelLabels[s.studentLevel] || s.studentLevel}</td>
+                <td className="text-sm text-on-surface-variant">{s.fieldOfStudy || "—"}</td>
+                <td className="text-right">
+                  <div className="flex items-center justify-end gap-0.5">
+                    <button onClick={() => toggleBookmark(s.id, "scholarship")} title={isBookmarked(s.id) ? "Remove bookmark" : "Bookmark"}
+                      className={`m3-btn-text p-1.5 ${isBookmarked(s.id) ? "text-primary" : "text-on-surface-variant"}`}>
+                      <Bookmark className={`w-4 h-4 ${isBookmarked(s.id) ? "fill-primary" : ""}`} />
+                    </button>
+                    <button onClick={() => toggleWon(s, "scholarship")} title={isWon(s.id) ? "Remove award" : "Mark as won"}
+                      className={`m3-btn-text p-1.5 ${isWon(s.id) ? "text-secondary" : "text-on-surface-variant"}`}>
+                      <Award className={`w-4 h-4 ${isWon(s.id) ? "text-secondary" : ""}`} />
+                    </button>
+                    {s.sourceUrl && (
+                      <a href={s.sourceUrl} target="_blank" rel="noreferrer" title="Open website"
+                        className="m3-btn-text p-1.5 text-on-surface-variant">
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={7} className="text-center text-sm text-on-surface-variant py-8 italic">No scholarships found</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {filtered.length > 0 && (
+        <div className="flex justify-between items-center px-1 py-2 text-sm text-on-surface-variant">
+          <span>{filtered.length} scholarships</span>
+          <span className="font-mono tabular-nums font-medium">${filtered.reduce((s, x) => s + (x.amountNumeric || 0), 0).toLocaleString()} total</span>
+        </div>
+      )}
+    </div>
+  );
+}

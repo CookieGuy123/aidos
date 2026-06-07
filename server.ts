@@ -229,22 +229,6 @@ const defaultInternships = [
     scamReason: "",
     sourceUrl: "https://www.deloitte.com/careers",
     fieldOfStudy: "Business"
-  },
-  {
-    id: "int-unverified-scam",
-    title: "Vigilant Security Services Remote Agent",
-    company: "Security Vault Processing LLC",
-    location: "Remote (100% Home)",
-    type: "Unpaid",
-    deadline: "2026-07-20",
-    studentLevel: "all",
-    description: "Simple task-handling position. Receive client payments in checks and wire transfers to local accounts. Training fee of $45 is required.",
-    requirements: ["Must have personal US bank account", "Pay $45 registration upfront for credential validation"],
-    isVerified: false,
-    scamFlag: true,
-    scamReason: "Asks candidates to process payments/wire deposits through their personal account and charges an upfront entry registration fee.",
-    sourceUrl: "http://unverified-recruitment-portal.net",
-    fieldOfStudy: "Business"
   }
 ];
 
@@ -308,6 +292,66 @@ async function startServer() {
     dynamicScholarships = [...defaultScholarships];
     dynamicInternships = [...defaultInternships];
     res.json({ success: true, message: "Databases successfully restored to pre-seeded templates." });
+  });
+
+  // Save user-discovered data (scholarships, internships, bookmarks, won, dismissed, preferences) to Supabase
+  app.post("/api/user/save-data", async (req, res) => {
+    const { userId, scholarships, internships, bookmarks, wonScholarships, dismissedNewIds, preferences } = req.body;
+    if (!userId) return res.status(400).json({ error: "Missing userId" });
+
+    if (!supabaseAdmin) {
+      return res.status(501).json({ error: "SUPABASE_SERVICE_KEY not set. No cloud storage available." });
+    }
+
+    try {
+      const { data: user } = await supabaseAdmin.auth.admin.getUserById(userId);
+      const existingMeta = user.user.user_metadata || {};
+
+      await supabaseAdmin.auth.admin.updateUserById(userId, {
+        user_metadata: {
+          ...existingMeta,
+          discovered_scholarships: scholarships || [],
+          discovered_internships: internships || [],
+          bookmarks: bookmarks || [],
+          won_scholarships: wonScholarships || {},
+          dismissed_new_ids: dismissedNewIds || [],
+          preferences: preferences || {},
+        }
+      });
+
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("[User Data] Save failed:", e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Load user-discovered data from Supabase user metadata
+  app.get("/api/user/load-data", async (req, res) => {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "Missing userId" });
+
+    if (!supabaseAdmin) {
+      return res.json({ success: false, error: "SUPABASE_SERVICE_KEY not set", scholarships: [], internships: [] });
+    }
+
+    try {
+      const { data: user } = await supabaseAdmin.auth.admin.getUserById(userId as string);
+      const meta = user.user.user_metadata || {};
+
+      res.json({
+        success: true,
+        scholarships: meta.discovered_scholarships || [],
+        internships: meta.discovered_internships || [],
+        bookmarks: meta.bookmarks || [],
+        wonScholarships: meta.won_scholarships || {},
+        dismissedNewIds: meta.dismissed_new_ids || [],
+        preferences: meta.preferences || {},
+      });
+    } catch (e: any) {
+      console.error("[User Data] Load failed:", e.message);
+      res.json({ success: false, error: e.message, scholarships: [], internships: [] });
+    }
   });
 
   // API Route: Get Scholarships list

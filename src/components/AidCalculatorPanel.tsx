@@ -1,322 +1,178 @@
 import React, { useState, useEffect } from "react";
-import { College } from "../types";
-import { DollarSign, ShieldAlert, Award, PiggyBank, BookOpen, Calculator, BarChart2, AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { Calculator, DollarSign, AlertTriangle, BarChart3, Clock } from "lucide-react";
+import { collegesData } from "../data/colleges";
 
-interface AidCalculatorPanelProps {
-  preselectedCollege: College | null;
-  totalScholarshipsWon: number;
+interface Props {
+  initialCollege?: any;
 }
 
-export default function AidCalculatorPanel({
-  preselectedCollege,
-  totalScholarshipsWon
-}: AidCalculatorPanelProps) {
-  // Inputs
-  const [collegeName, setCollegeName] = useState("Custom Institution");
-  const [stickerPrice, setStickerPrice] = useState<number>(55000);
-  const [scholarshipsVal, setScholarshipsVal] = useState<number>(totalScholarshipsWon);
-  const [projectedGrants, setProjectedGrants] = useState<number>(18000);
-  const [workStudyContribution, setWorkStudyContribution] = useState<number>(3000);
-  const [familyContribution, setFamilyContribution] = useState<number>(5000);
-  
-  // Custom states
-  const [academicYears, setAcademicYears] = useState<number>(4);
-  const [loanInterestRate, setLoanInterestRate] = useState<number>(5.5); // Average federal loan rate
+export default function AidCalculatorPanel({ initialCollege }: Props) {
+  const [collegeName, setCollegeName] = useState("");
+  const [tuition, setTuition] = useState(40000);
+  const [scholarships, setScholarships] = useState(5000);
+  const [grants, setGrants] = useState(3000);
+  const [workStudy, setWorkStudy] = useState(2000);
+  const [familyContribution, setFamilyContribution] = useState(10000);
+  const [years, setYears] = useState(4);
+  const [interestRate, setInterestRate] = useState(5.5);
+  const [loadedCollege, setLoadedCollege] = useState<any>(null);
 
-  // Prefill when preselectedCollege changes
   useEffect(() => {
-    if (preselectedCollege) {
-      setCollegeName(preselectedCollege.name);
-      setStickerPrice(preselectedCollege.tuitionSticker);
-      setProjectedGrants(preselectedCollege.avgAidPackage);
+    if (initialCollege) {
+      setCollegeName(initialCollege.name);
+      setTuition(initialCollege.tuitionSticker);
+      setLoadedCollege(initialCollege);
     }
-  }, [preselectedCollege]);
+  }, [initialCollege]);
 
-  // Track scholarship changes in real-time
-  useEffect(() => {
-    setScholarshipsVal(totalScholarshipsWon);
-  }, [totalScholarshipsWon]);
+  const loadCollege = (name: string) => {
+    const found = collegesData.find(c => c.name.toLowerCase().includes(name.toLowerCase()));
+    if (found) {
+      setCollegeName(found.name);
+      setTuition(found.tuitionSticker);
+      setLoadedCollege(found);
+    }
+  };
 
-  // Calculations
-  const totalFreeGiftAid = scholarshipsVal + projectedGrants;
-  
-  // Yearly cost left after scholarships and grants
-  const yearlyNetCost = Math.max(0, stickerPrice - totalFreeGiftAid);
-  
-  // Minus work-study and self/family payments to find amount that requires loans
-  const yearlyLoanRequired = Math.max(0, yearlyNetCost - workStudyContribution - familyContribution);
-
-  // 4 Years (or custom duration) projections
-  const fourYearNetOutOfPocket = yearlyNetCost * academicYears;
-  
-  // High-fidelity student loan interest calculation
-  const totalLoanPrincipal = yearlyLoanRequired * academicYears;
-  
-  // Approximate standard 10-year monthly loan repayment calculation:
-  // r = monthly interest, n = 120 payments
-  const monthlyRate = (loanInterestRate / 100) / 12;
-  const totalPayments = 120;
-  const monthlyPaymentAmt = totalLoanPrincipal > 0 
-    ? (totalLoanPrincipal * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments))) / (Math.pow(1 + monthlyRate, totalPayments) - 1)
+  const netCost = tuition - scholarships - grants - workStudy;
+  const remainingAfterFamily = Math.max(0, netCost - familyContribution);
+  const monthlyPayment = remainingAfterFamily > 0
+    ? (remainingAfterFamily * (interestRate / 100 / 12) * Math.pow(1 + interestRate / 100 / 12, years * 12)) / (Math.pow(1 + interestRate / 100 / 12, years * 12) - 1)
     : 0;
+  const totalRepaid = monthlyPayment * years * 12;
+  const totalInterest = totalRepaid - remainingAfterFamily;
 
-  const totalRepaidOver10Yrs = monthlyPaymentAmt * totalPayments;
-  const totalLoanInterestPaid = Math.max(0, totalRepaidOver10Yrs - totalLoanPrincipal);
-
-  // Alert flags
-  const debtAlertFlag = totalLoanPrincipal > 60000;
-  const safeInvestmentFlag = yearlyNetCost < 10000;
+  const maxBar = Math.max(tuition, 1);
+  const segments = [
+    { label: "Scholarships", value: scholarships, color: "bg-primary" },
+    { label: "Grants", value: grants, color: "bg-secondary" },
+    { label: "Work-Study", value: workStudy, color: "bg-tertiary" },
+    { label: "Family", value: familyContribution, color: "bg-on-surface-variant" },
+    { label: "Borrowing", value: remainingAfterFamily, color: "bg-error" },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Clean Header Divider */}
-      <div className="border-b border-holo-gray-border pb-2 flex justify-between items-end">
-        <h2 className="text-xl font-light tracking-tight text-white">
-          Financial Aid Modeler
-        </h2>
-        <span className="text-xs text-holo-blue-light font-sans flex items-center gap-1">
-          Loan projections updated
-        </span>
-      </div>
-
-      <div className="bg-holo-gray-dark p-4 border border-holo-gray-border grid grid-cols-1 lg:grid-cols-12 gap-6 relative font-sans">
-        <div className="lg:col-span-12 text-xs text-gray-400 flex justify-between items-center bg-black/40 p-2.5 border border-holo-gray-border font-sans">
-          <span>College Focus: {collegeName}</span>
-          <span>Out-of-Pocket Advisor</span>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="m3-card p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Calculator className="w-5 h-5 text-primary" />
+          <h2 className="text-lg font-semibold text-on-surface">Inputs</h2>
         </div>
-
-        {/* Inputs panel */}
-        <div className="lg:col-span-7 space-y-4">
-          <h3 className="text-sm text-holo-blue-light uppercase font-bold flex items-center gap-1.5 border-b border-holo-gray-border pb-1 font-sans">
-            <Calculator className="w-4 h-4" />
-            1. Configure Financial Details
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Institution name custom edit */}
-            <div>
-              <label className="text-xs text-gray-400 uppercase block mb-1">Target College</label>
-              <input
-                type="text"
-                value={collegeName}
-                onChange={(e) => setCollegeName(e.target.value)}
-                className="w-full bg-black text-gray-100 border border-holo-gray-border px-3 py-1.5 text-xs font-sans focus:border-holo-blue-light outline-none"
-              />
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-on-surface mb-1">College</label>
+            <div className="flex gap-2">
+              <input value={collegeName} onChange={e => setCollegeName(e.target.value)} onBlur={() => loadCollege(collegeName)}
+                className="m3-field flex-1" placeholder="Type name..." />
+              <button onClick={() => loadCollege(collegeName)} className="m3-btn-outlined text-sm px-4 py-2">Look up</button>
             </div>
-
-            {/* Sticker Tuition value */}
-            <div>
-              <label className="text-xs text-gray-400 uppercase block mb-1">Yearly Tuition Sticker Price ($)</label>
-              <div className="flex bg-black border border-holo-gray-border focus-within:border-holo-blue-light p-1">
-                <span className="text-xs text-gray-500 px-1 select-none">$</span>
-                <input
-                  type="number"
-                  value={stickerPrice}
-                  onChange={(e) => setStickerPrice(Math.max(0, Number(e.target.value)))}
-                  className="w-full bg-transparent text-gray-100 text-xs font-sans outline-none border-none"
-                />
-              </div>
-            </div>
+            {loadedCollege && (
+              <p className="text-xs text-secondary mt-1 font-medium">
+                Loaded: {loadedCollege.name} — avg aid ${loadedCollege.avgAidPackage.toLocaleString()}
+              </p>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans">
-            {/* Scholarships total input */}
-            <div>
-              <div className="flex justify-between mb-1">
-                <label className="text-xs text-holo-blue-light uppercase block">Scholarships Won ($/yr)</label>
-                {totalScholarshipsWon > 0 && (
-                  <span className="text-xs text-emerald-400 font-sans">({totalScholarshipsWon} bookmarked)</span>
-                )}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Sticker Tuition", value: tuition, set: setTuition },
+              { label: "Scholarships", value: scholarships, set: setScholarships },
+              { label: "Grants", value: grants, set: setGrants },
+              { label: "Work-Study", value: workStudy, set: setWorkStudy },
+            ].map(f => (
+              <div key={f.label}>
+                <label className="block text-sm font-medium text-on-surface mb-1">{f.label}</label>
+                <input type="number" value={f.value} onChange={e => f.set(parseInt(e.target.value) || 0)} className="m3-field w-full" />
               </div>
-              <div className="flex bg-black border border-holo-gray-border focus-within:border-holo-blue-light p-1">
-                <span className="text-xs text-gray-500 px-1 select-none">$</span>
-                <input
-                  type="number"
-                  value={scholarshipsVal}
-                  onChange={(e) => setScholarshipsVal(Math.max(0, Number(e.target.value)))}
-                  className="w-full bg-transparent text-gray-100 text-xs font-sans outline-none border-none"
-                />
-              </div>
-            </div>
-
-            {/* Federal or Institutional Grants */}
-            <div>
-              <label className="text-xs text-gray-400 uppercase block mb-1 font-sans">Projected Grants & Aid ($/yr)</label>
-              <div className="flex bg-black border border-holo-gray-border focus-within:border-holo-blue-light p-1">
-                <span className="text-xs text-gray-500 px-1 select-none">$</span>
-                <input
-                  type="number"
-                  value={projectedGrants}
-                  onChange={(e) => setProjectedGrants(Math.max(0, Number(e.target.value)))}
-                  className="w-full bg-transparent text-gray-100 text-xs font-sans outline-none border-none"
-                />
-              </div>
-            </div>
+            ))}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Work Study program contribution */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-400 uppercase block mb-1">Work-Study / Jobs ($/yr)</label>
-              <div className="flex bg-black border border-holo-gray-border focus-within:border-holo-blue-light p-1">
-                <span className="text-xs text-gray-500 px-0.5 select-none">$</span>
-                <input
-                  type="number"
-                  value={workStudyContribution}
-                  onChange={(e) => setWorkStudyContribution(Math.max(0, Number(e.target.value)))}
-                  className="w-full bg-transparent text-gray-100 text-xs font-sans outline-none border-none"
-                />
-              </div>
+              <label className="block text-sm font-medium text-on-surface mb-1">Family Contribution</label>
+              <input type="number" value={familyContribution} onChange={e => setFamilyContribution(parseInt(e.target.value) || 0)} className="m3-field w-full" />
             </div>
-
-            {/* Family / Personal Out of Pocket Savings payments */}
             <div>
-              <label className="text-xs text-gray-400 uppercase block mb-1">Family Contribution ($/yr)</label>
-              <div className="flex bg-black border border-holo-gray-border focus-within:border-holo-blue-light p-1">
-                <span className="text-xs text-gray-500 px-0.5 select-none">$</span>
-                <input
-                  type="number"
-                  value={familyContribution}
-                  onChange={(e) => setFamilyContribution(Math.max(0, Number(e.target.value)))}
-                  className="w-full bg-transparent text-gray-100 text-xs font-sans outline-none border-none"
-                />
-              </div>
-            </div>
-
-            {/* Program duration */}
-            <div>
-              <label className="text-xs text-gray-400 uppercase block mb-1">Academic Duration</label>
-              <select
-                value={academicYears}
-                onChange={(e) => setAcademicYears(Number(e.target.value))}
-                className="w-full bg-black text-gray-200 border border-holo-gray-border p-1 text-xs font-sans focus:border-holo-blue-light outline-none"
-              >
-                <option value={4}>4 Years (Undergraduate)</option>
-                <option value={2}>2 Years (Associate/Transfer)</option>
-                <option value={1}>1 Year (Specialist)</option>
-                <option value={5}>5 Years (Dual Degree)</option>
-              </select>
+              <label className="block text-sm font-medium text-on-surface mb-1">Loan Years</label>
+              <input type="number" min={1} max={10} value={years} onChange={e => setYears(parseInt(e.target.value) || 4)} className="m3-field w-full" />
             </div>
           </div>
 
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-xs text-gray-400 uppercase">Estimated Loan Interest Rate ({loanInterestRate}%)</label>
+            <label className="block text-sm font-medium text-on-surface mb-1">Interest Rate: {interestRate}%</label>
+            <input type="range" min={0} max={15} step={0.5} value={interestRate} onChange={e => setInterestRate(parseFloat(e.target.value))}
+              className="w-full accent-primary" />
+            <div className="flex justify-between text-xs text-on-surface-variant mt-0.5">
+              <span>0%</span><span>5%</span><span>10%</span><span>15%</span>
             </div>
-            <input
-              type="range"
-              min="2"
-              max="12"
-              step="0.1"
-              value={loanInterestRate}
-              onChange={(e) => setLoanInterestRate(Number(e.target.value))}
-              className="w-full accent-holo-blue-light h-1 bg-black outline-none border border-holo-gray-border cursor-pointer animate-none"
-            />
           </div>
         </div>
+      </div>
 
-        {/* Results Projection card visual */}
-        <div className="lg:col-span-5 bg-black border-l-2 border-holo-blue-light p-4 flex flex-col justify-between space-y-4">
-          <div className="space-y-3 font-sans">
-            <span className="text-xs font-bold text-holo-blue-light uppercase tracking-wider flex items-center gap-1 font-sans">
-              <BarChart2 className="w-4 h-4" />
-              2. Projections Summary
-            </span>
+      <div className="m3-card p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 className="w-5 h-5 text-secondary" />
+          <h2 className="text-lg font-semibold text-on-surface">Projections</h2>
+        </div>
+        <div className="space-y-4">
+          <div className="bg-surface-container rounded-xl p-4 flex items-center justify-between">
+            <span className="text-sm font-medium text-on-surface-variant">Net Cost per Year</span>
+            <span className="text-2xl font-bold tabular-nums text-on-surface">${netCost.toLocaleString()}</span>
+          </div>
 
-            {/* Sticker vs Net free aid breakdown */}
-            <div className="space-y-1 text-xs text-gray-300">
-              <div className="flex justify-between">
-                <span>Sticker Cost:</span>
-                <span className="text-white font-medium">${stickerPrice.toLocaleString()}/yr</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Free Gift Aid (Scholarships + Grants):</span>
-                <span className="text-emerald-400 font-medium">-${totalFreeGiftAid.toLocaleString()}/yr</span>
-              </div>
-              <div className="border-t border-dashed border-holo-gray-border my-1" />
-              
-              {/* Year out of pocket cost */}
-              <div className="flex justify-between font-bold">
-                <span className="text-holo-blue-light">Yearly Net Out-of-Pocket:</span>
-                <span className="text-white">${yearlyNetCost.toLocaleString()}</span>
-              </div>
+          <div>
+            <p className="text-sm font-medium text-on-surface mb-2">Funding Sources</p>
+            <div className="h-4 flex rounded-lg overflow-hidden">
+              {segments.map(s => (
+                <div key={s.label}
+                  className={`${s.color} ${s.value === 0 ? "opacity-0" : ""} first:rounded-l-lg last:rounded-r-lg`}
+                  style={{ width: `${(s.value / maxBar) * 100}%`, minWidth: s.value > 0 ? "4px" : 0 }} />
+              ))}
             </div>
-
-            {/* Standard Cost bar graph rendering */}
-            <div className="space-y-1.5 pt-2 font-sans">
-              <span className="text-xs text-gray-500 uppercase tracking-widest block font-medium">COST BRACKET VISUALRATIO</span>
-              <div className="h-4 w-full bg-holo-gray-light border border-holo-gray-border flex overflow-hidden">
-                {stickerPrice > 0 && (
-                  <>
-                    <div 
-                      title={`Gift Aid: $${totalFreeGiftAid.toLocaleString()}`}
-                      className="bg-emerald-500 h-full" 
-                      style={{ width: `${Math.min(100, (totalFreeGiftAid / stickerPrice) * 100)}%` }} 
-                    />
-                    <div 
-                      title={`Self-Funded/Work-Study: $${(workStudyContribution + familyContribution).toLocaleString()}`}
-                      className="bg-[#33b5e5] h-full" 
-                      style={{ width: `${Math.min(100, (((workStudyContribution + familyContribution)) / stickerPrice) * 100)}%` }} 
-                    />
-                    <div 
-                      title={`Requires Borrowing: $${yearlyLoanRequired.toLocaleString()}`}
-                      className="bg-red-500 h-full flex-grow" 
-                    />
-                  </>
-                )}
-              </div>
-              <div className="flex justify-between text-xs text-gray-400 font-sans">
-                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 bg-emerald-500 inline-block" />FREE AID (GIFT)</span>
-                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 bg-[#33b5e5] inline-block" />EARNED/OWN CASH</span>
-                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 bg-red-500 inline-block" />DEBT BARRIER</span>
-              </div>
+            <div className="grid grid-cols-2 gap-1 mt-2">
+              {segments.map(s => (
+                <div key={s.label} className="flex items-center gap-2 text-sm">
+                  <div className={`w-2.5 h-2.5 rounded-sm ${s.color}`} />
+                  <span className="text-on-surface-variant">{s.label}</span>
+                  <span className="font-mono tabular-nums font-medium ml-auto">${s.value.toLocaleString()}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="bg-holo-gray-light p-3 border border-holo-gray-border space-y-2 font-sans">
-            <div>
-              <span className="text-xs text-gray-400 uppercase tracking-widest block leading-none font-medium">Estimated Borrowing on Graduation</span>
-              <span className={`text-2xl font-bold tracking-tight block ${debtAlertFlag ? "text-red-500" : "text-white"}`}>
-                ${totalLoanPrincipal.toLocaleString()}
+          <div className="border-t border-surface-dim pt-3 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-on-surface-variant">Annual borrowing</span>
+              <span className="font-mono tabular-nums font-semibold text-error">${remainingAfterFamily.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-on-surface-variant">Monthly payment</span>
+              <span className="font-mono tabular-nums font-semibold">${monthlyPayment.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-on-surface-variant">Total repaid</span>
+              <span className="font-mono tabular-nums font-semibold">${totalRepaid.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-on-surface-variant">Total interest</span>
+              <span className={`font-mono tabular-nums font-semibold ${totalInterest > 0 ? "text-error" : "text-success"}`}>
+                ${Math.max(0, totalInterest).toFixed(2)}
               </span>
-              <span className="text-xs text-gray-500 uppercase">({academicYears} academic years of student loans)</span>
             </div>
-
-            {totalLoanPrincipal > 0 && (
-              <div className="text-xs text-gray-300 space-y-1 pt-1.5 border-t border-dashed border-holo-gray-border font-sans">
-                <div className="flex justify-between">
-                  <span>Standard 10-Year Payment:</span>
-                  <span className="text-white font-bold">${Math.round(monthlyPaymentAmt)}/mo</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Estimated Interest Accrued:</span>
-                  <span className="text-red-400 font-bold">${Math.round(totalLoanInterestPaid).toLocaleString()}</span>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Alert flags based on cost and debt levels */}
-          <div className="text-xs leading-normal font-sans">
-            {debtAlertFlag && (
-              <div className="bg-red-950/40 border border-red-700/60 text-red-300 p-2 font-semibold flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                Notice: Projected loans exceed recommended thresholds. Try finding more sponsorships or comparing other lower-sticker institutions.
-              </div>
-            )}
-            {safeInvestmentFlag && (
-              <div className="bg-emerald-950/40 border border-emerald-700/60 text-emerald-300 p-2 font-semibold flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                Great Strategy: Net annual payments are highly affordable. Excellent out-of-pocket setup!
-              </div>
-            )}
-            {!debtAlertFlag && !safeInvestmentFlag && (
-              <div className="bg-holo-blue-dim/20 border border-holo-blue-dark/50 text-holo-blue-light p-2 flex items-start gap-2">
-                <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                Standard Plan: Standard college cost configuration. Keep monitoring state and local grant deadlines.
-              </div>
-            )}
-          </div>
+          {remainingAfterFamily > tuition * 0.5 && (
+            <div className="flex items-start gap-2 p-3 bg-error-container rounded-xl text-sm text-on-error-container">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>High borrowing. Consider more scholarships or a lower-cost school.</span>
+            </div>
+          )}
+          {interestRate >= 10 && (
+            <div className="flex items-start gap-2 p-3 bg-warning-container rounded-xl text-sm text-warning">
+              <Clock className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>Rate above 10%. Explore federal loan options.</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

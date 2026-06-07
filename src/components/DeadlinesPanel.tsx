@@ -1,346 +1,143 @@
 import React, { useState } from "react";
-import { College } from "../types";
+import { MapPin, Calendar, DollarSign, Percent, University, Plus, X, Search, Calculator } from "lucide-react";
 import { collegesData } from "../data/colleges";
-import { Clock, DollarSign, Pin, Landmark, Code, GraduationCap, Palette, Stethoscope } from "lucide-react";
 
-interface DeadlinesPanelProps {
-  onSelectCollegeForCalculator: (college: College) => void;
+interface Props {
+  onSelectCollege?: (college: any) => void;
 }
 
-export default function DeadlinesPanel({ onSelectCollegeForCalculator }: DeadlinesPanelProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTier, setSelectedTier] = useState<"all" | "Ivy League" | "Top Engineering" | "Top Public" | "Top Liberal Arts" | "Specialized Health">("all");
-  const [selectedSpecialty, setSelectedSpecialty] = useState<"all" | "Engineering" | "Health" | "Business" | "Arts" | "Humanities" | "General">("all");
-  const [selectedPriceTier, setSelectedPriceTier] = useState<"all" | "high" | "low">("all");
+const tierColors: Record<string, string> = {
+  "Ivy League": "bg-primary-container text-primary",
+  "Top Engineering": "bg-secondary-container text-secondary",
+  "Top Public": "bg-tertiary-container text-tertiary",
+  "Top Liberal Arts": "bg-surface-dim text-on-surface-variant",
+  "Specialized Health": "bg-error-container text-error",
+};
 
-  const [colleges, setColleges] = useState<College[]>(collegesData);
+export default function DeadlinesPanel({ onSelectCollege }: Props) {
+  const [search, setSearch] = useState("");
+  const [tierFilter, setTierFilter] = useState("all");
+  const [customOpen, setCustomOpen] = useState(false);
+  const [custom, setCustom] = useState({ name: "", location: "", acceptanceRate: "", tuitionSticker: "", avgAidPackage: "", deadlineED: "", deadlineRD: "" });
+  const [customColleges, setCustomColleges] = useState<any[]>([]);
 
-  // Custom addition of university deadlines in app
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newTier, setNewTier] = useState<"Ivy League" | "Top Engineering" | "Top Public" | "Top Liberal Arts" | "Specialized Health">("Top Public");
-  const [newSpecialization, setNewSpecialization] = useState<"Engineering" | "Health" | "Business" | "Arts" | "Humanities" | "General">("General");
-  const [newTuition, setNewTuition] = useState<number>(45000);
-  const [newAid, setNewAid] = useState<number>(20000);
-  const [newDeadlineED, setNewDeadlineED] = useState("");
-  const [newDeadlineRD, setNewDeadlineRD] = useState("");
-  const [newLocation, setNewLocation] = useState("");
-  const [newAcceptance, setNewAcceptance] = useState<number>(10);
-
-  const handleAddCollege = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName) return;
-    const item: College = {
-      id: `col-custom-${Date.now()}`,
-      name: newName,
-      tier: newTier,
-      specialization: newSpecialization,
-      tuitionSticker: Number(newTuition) || 40000,
-      avgAidPackage: Number(newAid) || 15000,
-      deadlineED: newDeadlineED || "Nov 01",
-      deadlineRD: newDeadlineRD || "Jan 01",
-      location: newLocation || "USA",
-      acceptanceRate: Number(newAcceptance) || 15
-    };
-    setColleges([item, ...colleges]);
-    setShowAddForm(false);
-    // clear fields
-    setNewName("");
-    setNewDeadlineED("");
-    setNewDeadlineRD("");
-    setNewLocation("");
-  };
-
-  const filteredColleges = colleges.filter(college => {
-    // Search match
-    if (searchTerm && !college.name.toLowerCase().includes(searchTerm.toLowerCase()) && !college.location.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false;
-    }
-    // Tier match
-    if (selectedTier !== "all" && college.tier !== selectedTier) {
-      return false;
-    }
-    // Specialty match
-    if (selectedSpecialty !== "all" && college.specialization !== selectedSpecialty) {
-      return false;
-    }
-    // Price match
-    if (selectedPriceTier === "high" && college.tuitionSticker <= 60000) return false;
-    if (selectedPriceTier === "low" && college.tuitionSticker > 60000) return false;
-
-    return true;
+  const allColleges = [...collegesData, ...customColleges].filter(c => {
+    if (tierFilter !== "all" && c.tier !== tierFilter) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return c.name.toLowerCase().includes(q) || (c.location || "").toLowerCase().includes(q);
   });
 
+  const addCustom = () => {
+    if (!custom.name) return;
+    setCustomColleges(prev => [{
+      ...custom, id: "custom-" + Date.now(), tier: "Top Public",
+      specialization: "General",
+      acceptanceRate: parseFloat(custom.acceptanceRate) || 0,
+      tuitionSticker: parseInt(custom.tuitionSticker) || 0,
+      avgAidPackage: parseInt(custom.avgAidPackage) || 0,
+    }, ...prev]);
+    setCustom({ name: "", location: "", acceptanceRate: "", tuitionSticker: "", avgAidPackage: "", deadlineED: "", deadlineRD: "" });
+    setCustomOpen(false);
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Clean Header Divider */}
-      <div className="border-b border-holo-gray-border pb-2 flex justify-between items-end">
-        <h2 className="text-xl font-light tracking-tight text-white">
-          College Admissions & Timelines
-        </h2>
-      </div>
-
-      <div className="bg-holo-gray-dark border border-holo-gray-border p-4 text-xs leading-normal font-sans text-gray-300 flex items-start gap-2">
-        <Pin className="w-4 h-4 shrink-0 mt-0.5 text-holo-blue-light" />
-        <span><strong>College Admissions Quick Info:</strong> Early Decision (ED) programs are binding agreements. Regular Decision (RD) applications commonly close in early January. You can track tuition costs here and load them instantly into the <strong>Financial Aid Calculator</strong> to project your out-of-pocket costs.</span>
-      </div>
-
-      {/* Control Widgets */}
-      <div className="bg-holo-gray-dark border border-holo-gray-border p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Quick Search */}
-          <div className="space-y-1">
-            <label className="text-2xs font-mono text-holo-blue-light uppercase">Search Institution</label>
-            <input
-              type="text"
-              placeholder="e.g. Stanford or California"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full bg-black text-gray-200 border-b border-holo-gray-border py-1 px-2 text-xs font-mono focus:border-holo-blue-light outline-none"
-            />
+    <div>
+      <div className="m3-card p-3 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex-1 min-w-[240px] relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+            <input value={search} onChange={e => setSearch(e.target.value)} className="m3-field w-full pl-9" placeholder="Search colleges..." />
           </div>
-
-          {/* Category Tier Filter */}
-          <div className="space-y-1">
-            <label className="text-2xs font-mono text-holo-blue-light uppercase">Academic Tier</label>
-            <select
-              value={selectedTier}
-              onChange={e => setSelectedTier(e.target.value as any)}
-              className="w-full bg-black text-gray-200 border border-holo-gray-border p-1 text-xs font-mono focus:border-holo-blue-light outline-none text-white font-sans"
-            >
-              <option value="all"> All Academic Categories</option>
-              <option value="Ivy League">Ivy League Elite</option>
-              <option value="Top Engineering">Elite Engineering & STEM</option>
-              <option value="Top Public">Elite Public State Universities</option>
-              <option value="Top Liberal Arts">Premier Liberal Arts Colleges</option>
-              <option value="Specialized Health">Specialized Clinical Centers</option>
-            </select>
-          </div>
-
-          {/* Specialization Domain focus */}
-          <div className="space-y-1">
-            <label className="text-2xs font-mono text-holo-blue-light uppercase">Power Fields</label>
-            <select
-              value={selectedSpecialty}
-              onChange={e => setSelectedSpecialty(e.target.value as any)}
-              className="w-full bg-black text-gray-200 border border-holo-gray-border p-1 text-xs font-mono focus:border-holo-blue-light outline-none text-white font-sans"
-            >
-              <option value="all"> All Specialties</option>
-              <option value="Engineering">Engineering / Technology</option>
-              <option value="Health">Biomedical / Pre-Medicine</option>
-              <option value="Business">Finance / Business / Commerce</option>
-              <option value="Arts font-sans">Fine Arts / Design</option>
-              <option value="Humanities">Humanities / Classical Studies</option>
-              <option value="General font-sans">General Education focus</option>
-            </select>
-          </div>
-
-          {/* Budget tier */}
-          <div className="space-y-1">
-            <label className="text-2xs font-mono text-holo-blue-light uppercase">Sticker Tuition Volume</label>
-            <select
-              value={selectedPriceTier}
-              onChange={e => setSelectedPriceTier(e.target.value as any)}
-              className="w-full bg-black text-gray-200 border border-holo-gray-border p-1 text-xs font-mono focus:border-holo-blue-light outline-none text-white font-custom"
-            >
-              <option value="all"> All Tuition Fees</option>
-              <option value="high">Above $60,000 /yr (Standard Private)</option>
-              <option value="low">Below $60,000 /yr (Subsidized/Public)</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center pt-2 border-t border-holo-gray-border">
-          <span className="text-xs text-gray-400 font-sans">Found {filteredColleges.length} colleges match</span>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="text-xs font-sans bg-black hover:bg-holo-blue-dim border border-holo-blue-dark text-holo-blue-light px-3 py-1.5 cursor-pointer transition-all"
-          >
-            {showAddForm ? "Close Form" : "Add Custom College"}
+          <select value={tierFilter} onChange={e => setTierFilter(e.target.value)} className="m3-select">
+            <option value="all">All tiers</option>
+            <option value="Ivy League">Ivy League</option>
+            <option value="Top Engineering">Engineering</option>
+            <option value="Top Public">Public</option>
+            <option value="Top Liberal Arts">Liberal Arts</option>
+            <option value="Specialized Health">Health</option>
+          </select>
+          <button onClick={() => setCustomOpen(!customOpen)} className="m3-btn-outlined text-sm px-4 py-2">
+            <Plus className="w-4 h-4" /> Add College
           </button>
         </div>
       </div>
 
-      {/* Add Custom college timelines */}
-      {showAddForm && (
-        <form onSubmit={handleAddCollege} className="bg-holo-gray-dark border border-holo-blue-dark p-4 space-y-4">
-          <h3 className="text-xs font-mono text-holo-blue-light uppercase border-b border-holo-gray-border pb-1 font-bold">
-            Define Custom College Deadline & Aid Profile
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-3xs font-mono text-gray-400 block">Institution Name *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Duke University"
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                className="w-full bg-black text-gray-200 border-b border-holo-gray-border px-2 py-0.5 text-xs font-mono focus:border-holo-blue-light outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-3xs font-mono text-gray-400 block">Academic Tier</label>
-              <select
-                value={newTier}
-                onChange={e => setNewTier(e.target.value as any)}
-                className="w-full bg-black text-gray-200 border-b border-holo-gray-border px-2 py-0.5 text-xs font-mono focus:border-holo-blue-light outline-none"
-              >
-                <option value="Ivy League">Ivy League</option>
-                <option value="Top Engineering">Top Engineering</option>
-                <option value="Top Public">Top Public</option>
-                <option value="Top Liberal Arts">Top Liberal Arts</option>
-                <option value="Specialized Health">Specialized Health</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-3xs font-mono text-gray-400 block">Location</label>
-              <input
-                type="text"
-                placeholder="e.g. Durham, NC"
-                value={newLocation}
-                onChange={e => setNewLocation(e.target.value)}
-                className="w-full bg-black text-gray-200 border-b border-holo-gray-border px-2 py-0.5 text-xs font-mono focus:border-holo-blue-light outline-none"
-              />
-            </div>
+      {customOpen && (
+        <div className="m3-card p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-on-surface">Add College</h3>
+            <button onClick={() => setCustomOpen(false)} className="m3-btn-text p-1"><X className="w-4 h-4" /></button>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-3xs font-mono text-gray-400 block">Sticker Tuition Price ($/year) *</label>
-              <input
-                type="number"
-                required
-                value={newTuition}
-                onChange={e => setNewTuition(Number(e.target.value))}
-                className="w-full bg-black text-gray-200 border-b border-holo-gray-border px-2 py-0.5 text-xs font-mono focus:border-holo-blue-light outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-3xs font-mono text-gray-400 block">Average Need/Merit Financial Aid ($)</label>
-              <input
-                type="number"
-                value={newAid}
-                onChange={e => setNewAid(Number(e.target.value))}
-                className="w-full bg-black text-gray-200 border-b border-holo-gray-border px-2 py-0.5 text-xs font-mono focus:border-holo-blue-light outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-3xs font-mono text-gray-400 block">Early Decision Deadline</label>
-              <input
-                type="text"
-                placeholder="e.g. Nov 01"
-                value={newDeadlineED}
-                onChange={e => setNewDeadlineED(e.target.value)}
-                className="w-full bg-black text-gray-200 border-b border-holo-gray-border px-2 py-0.5 text-xs font-mono focus:border-holo-blue-light outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-3xs font-mono text-gray-400 block">Regular Decision Deadline</label>
-              <input
-                type="text"
-                placeholder="e.g. Jan 01"
-                value={newDeadlineRD}
-                onChange={e => setNewDeadlineRD(e.target.value)}
-                className="w-full bg-black text-gray-200 border-b border-holo-gray-border px-2 py-0.5 text-xs font-mono focus:border-holo-blue-light outline-none"
-              />
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <input value={custom.name} onChange={e => setCustom(c => ({ ...c, name: e.target.value }))} className="m3-field" placeholder="College name" />
+            <input value={custom.location} onChange={e => setCustom(c => ({ ...c, location: e.target.value }))} className="m3-field" placeholder="Location" />
+            <input value={custom.acceptanceRate} onChange={e => setCustom(c => ({ ...c, acceptanceRate: e.target.value }))} className="m3-field" placeholder="Rate %" type="number" step="0.1" />
+            <button onClick={addCustom} className="m3-btn-filled text-sm px-4 self-end">Save</button>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-3xs font-mono text-gray-400 block">Primary Specialization Focus</label>
-              <select
-                value={newSpecialization}
-                onChange={e => setNewSpecialization(e.target.value as any)}
-                className="w-full bg-black text-gray-200 border-b border-holo-gray-border px-2 py-0.5 text-xs font-mono focus:border-holo-blue-light outline-none"
-              >
-                <option value="Engineering">Engineering / Computations</option>
-                <option value="Health">Clinical Health / Pre-Med</option>
-                <option value="Business">Finance & Economics</option>
-                <option value="Arts">Graphic & Fine Arts</option>
-                <option value="Humanities">Classical Humanities</option>
-                <option value="General">General / All major fields</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-3xs font-mono text-gray-400 block">Acceptance Rate %</label>
-              <input
-                type="number"
-                value={newAcceptance}
-                onChange={e => setNewAcceptance(Number(e.target.value))}
-                className="w-full bg-black text-gray-200 border-b border-holo-gray-border px-2 py-0.5 text-xs font-mono focus:border-holo-blue-light outline-none"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="bg-holo-blue-dark text-black uppercase font-mono font-bold text-xs py-1.5 px-4 rounded-none hover:bg-holo-blue-light transition-all cursor-pointer"
-          >
-            INCORPORATE TIMELINE RECORD
-          </button>
-        </form>
+        </div>
       )}
 
-      {/* Colleges list */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredColleges.map(coll => {
-          return (
-            <div
-              key={coll.id}
-              className="bg-holo-gray-dark border border-holo-gray-border hover:border-holo-blue-dark/50 p-4 space-y-3 flex flex-col justify-between font-sans"
-            >
-              <div>
-                <div className="flex justify-between items-start gap-1">
-                  <div>
-                    <span className="text-xs text-holo-blue-light uppercase tracking-wider block font-bold">
-                      {coll.tier} &bull; {coll.specialization} FOCUS
-                    </span>
-                    <h4 className="text-base font-bold text-gray-100 mt-1">{coll.name}</h4>
-                    <span className="text-xs text-gray-400 block mt-0.5">{coll.location}</span>
-                  </div>
-
-                  <span className="text-xs text-gray-400 border border-holo-gray-border px-2 py-0.5 bg-black rounded-sm">
-                    Acceptance: {coll.acceptanceRate}%
-                  </span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {allColleges.map(c => (
+          <div key={c.id} className="m3-card p-0 overflow-hidden">
+            <div className="p-4 pb-3">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <University className="w-5 h-5 text-primary shrink-0" />
+                  <h3 className="text-base font-semibold text-on-surface truncate">{c.name}</h3>
                 </div>
-
-                {/* Deadlines Section */}
-                <div className="grid grid-cols-2 gap-2 mt-3 bg-black/60 p-2.5 border border-holo-gray-border">
-                  <div>
-                    <span className="text-xs text-gray-500 uppercase block tracking-wider leading-none">Early Decision (ED)</span>
-                    <span className="text-xs text-white flex items-center gap-1 mt-1 font-bold">
-                      <Clock className="w-3.5 h-3.5 text-holo-blue-light mr-1" />
-                      {coll.deadlineED}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-gray-500 uppercase block tracking-wider leading-none">Regular Decision (RD)</span>
-                    <span className="text-xs text-white flex items-center gap-1 mt-1 font-bold">
-                      <Clock className="w-3.5 h-3.5 text-holo-blue-light mr-1" />
-                      {coll.deadlineRD}
-                    </span>
-                  </div>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ml-2 ${tierColors[c.tier] || "bg-surface-dim text-on-surface-variant"}`}>
+                  {c.tier === "Ivy League" ? "Ivy" : c.tier === "Top Engineering" ? "ENG" : c.tier === "Top Public" ? "PUB" : c.tier === "Top Liberal Arts" ? "LA" : c.tier === "Specialized Health" ? "HLTH" : c.tier}
+                </span>
+              </div>
+              {c.location && (
+                <div className="flex items-center gap-1.5 text-sm text-on-surface-variant mb-1.5">
+                  <MapPin className="w-3.5 h-3.5" /> {c.location}
                 </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-3 text-xs text-gray-300">
-                  <span>Sticker Tuition: <strong className="text-white font-semibold">${coll.tuitionSticker.toLocaleString()}/yr</strong></span>
-                  <span>Average Financial Aid: <strong className="text-emerald-400 font-semibold">${coll.avgAidPackage.toLocaleString()}/yr</strong></span>
+              )}
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Percent className="w-3.5 h-3.5 text-on-surface-variant" />
+                  <span className="font-mono tabular-nums font-medium">{c.acceptanceRate}%</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <DollarSign className="w-3.5 h-3.5 text-on-surface-variant" />
+                  <span className="font-mono tabular-nums font-medium">${c.tuitionSticker.toLocaleString()}</span>
                 </div>
               </div>
-
-              {/* Loader into calculations */}
-              <button
-                onClick={() => onSelectCollegeForCalculator(coll)}
-                className="w-full mt-2 bg-holo-gray-light border border-holo-gray-border text-holo-blue-light text-xs py-2 font-sans font-medium hover:bg-holo-blue-dim transition-all text-center cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <DollarSign className="w-4 h-4 text-holo-blue-light" />
-                Load Tuition into Calculator
-              </button>
+              {c.avgAidPackage > 0 && (
+                <div className="flex items-center gap-1.5 text-sm mt-1">
+                  <DollarSign className="w-3.5 h-3.5 text-secondary" />
+                  <span className="font-mono tabular-nums text-secondary font-medium">Avg aid: ${c.avgAidPackage.toLocaleString()}</span>
+                </div>
+              )}
             </div>
-          );
-        })}
+            <div className="border-t border-surface-dim px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
+              <div className="flex gap-3">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-primary" />
+                  <span className="font-medium">ED:</span>
+                  <span className="font-mono">{c.deadlineED}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-on-surface-variant" />
+                  <span className="font-medium">RD:</span>
+                  <span className="font-mono">{c.deadlineRD}</span>
+                </div>
+              </div>
+              {onSelectCollege && (
+                <button onClick={(e) => { e.stopPropagation(); onSelectCollege(c); }}
+                  className="m3-btn-text text-xs py-1 px-2 shrink-0">
+                  <Calculator className="w-3.5 h-3.5" /> Load
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+        {allColleges.length === 0 && (
+          <div className="col-span-full text-center text-sm text-on-surface-variant py-8 italic">No colleges match your filters</div>
+        )}
       </div>
     </div>
   );
