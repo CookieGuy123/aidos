@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../supabaseClient";
 import type { Scholarship, Internship, BookmarkedOpportunity, NotificationItem, UserPreferences, UserProfile } from "../../types";
 import ScholarshipsPanel from "./components/ScholarshipsPanel";
@@ -9,6 +9,22 @@ import ProfilePanel from "./components/ProfilePanel";
 import AuthModal from "./components/AuthModal";
 import ResumeScannerModal from "./components/ResumeScannerModal";
 import AdminPanel from "../../components/AdminPanel";
+import ToastContainer from "../../components/ToastContainer";
+
+function formatTimestamp(ts: string): string {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts;
+  const diff = Date.now() - d.getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString();
+}
 import { Search, Bookmark, Award, Bell, School, Briefcase, Calendar, Calculator, User, LogIn, LogOut, Home, Trophy, Layers, Clock, DollarSign, Shield, Sparkles, X, Sun, Moon, Maximize2, Minimize2, Loader2, Upload, ShieldCheck } from "lucide-react";
 
 export default function App() {
@@ -19,6 +35,8 @@ export default function App() {
   const [wonScholarships, setWonScholarships] = useState<Scholarship[]>([]);
   const [wonInternships, setWonInternships] = useState<Internship[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [toasts, setToasts] = useState<{ id: string; title: string; message: string; type: "deadline" | "alert" | "system" }[]>([]);
+  const dismissToast = useCallback((id: string) => setToasts(prev => prev.filter(t => t.id !== id)), []);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [preferences, setPreferences] = useState<UserPreferences>({ age: 0, studentLevel: "high_school", householdIncome: 0, fieldOfInterest: "" });
@@ -75,6 +93,30 @@ export default function App() {
     if (dataLoaded && !user) saveLocalData();
   }, [bookmarked, wonScholarships, wonInternships, dismissedNewIds, preferences, dataLoaded]);
 
+  // Deadline alerts — check every 30 minutes, avoids duplicate alerts
+  const notifiedDeadlines = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!dataLoaded) return;
+    const checkDeadlines = () => {
+      const now = new Date();
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      const allItems = [...scholarships.map(s => ({ ...s, __type: "scholarship" as const })), ...internships.map(i => ({ ...i, __type: "internship" as const }))];
+      allItems.forEach(item => {
+        if (notifiedDeadlines.current.has(item.id)) return;
+        const deadline = new Date(item.deadline);
+        const diff = deadline.getTime() - now.getTime();
+        if (diff > 0 && diff <= sevenDays) {
+          notifiedDeadlines.current.add(item.id);
+          const daysLeft = Math.ceil(diff / (24 * 60 * 60 * 1000));
+          addNotification("Deadline Approaching", `"${item.name}" closes in ${daysLeft} day${daysLeft > 1 ? "s" : ""}!`, "deadline");
+        }
+      });
+    };
+    checkDeadlines();
+    const interval = setInterval(checkDeadlines, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [dataLoaded, scholarships, internships]);
+
   const fetchInitialData = async () => {
     setIsLoading(true);
     try {
@@ -114,19 +156,40 @@ export default function App() {
 
   const isBookmarked = (id: string) => bookmarked.some(b => b.id === id);
   const toggleBookmark = (id: string, type: "scholarship" | "internship") => {
-    setBookmarked(prev => isBookmarked(id) ? prev.filter(b => b.id !== id) : [...prev, { id, type, savedAt: new Date().toISOString() }]);
+    const adding = !isBookmarked(id);
+    setBookmarked(prev => adding ? [...prev, { id, type, savedAt: new Date().toISOString() }] : prev.filter(b => b.id !== id));
+    if (adding) {
+      const item = [...scholarships, ...internships].find(o => o.id === id);
+      const itemName = item ? ("name" in item ? item.name : (item as any).title || id) : id;
+      addNotification("Opportunity Saved", `Added "${itemName}" to bookmarks.`, "system");
+    } else {
+      addNotification("Bookmark Removed", `Removed from bookmarks.`, "system");
+    }
   };
 
   const isWon = (id: string) => wonScholarships.some(s => s.id === id) || wonInternships.some(i => i.id === id);
   const toggleWon = (item: Scholarship | Internship, type: "scholarship" | "internship") => {
+    const adding = !isWon(item.id);
     if (type === "scholarship") setWonScholarships(prev => prev.some(s => s.id === item.id) ? prev.filter(s => s.id !== item.id) : [...prev, item as Scholarship]);
     else setWonInternships(prev => prev.some(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [...prev, item as Internship]);
+    const itemName = "name" in item ? item.name : (item as any).title || item.id;
+    if (adding) {
+      addNotification("Award Secured!", `+"${itemName}" added to won list.`, "alert");
+    } else {
+      addNotification("Award Removed", `"${itemName}" removed from won list.`, "system");
+    }
   };
 
-  const dismissNew = (id: string) => { if (!dismissedNewIds.includes(id)) setDismissedNewIds(prev => [...prev, id]); };
+  const dismissNew = (id: string) => {
+    if (!dismissedNewIds.includes(id)) {
+      setDismissedNewIds(prev => [...prev, id]);
+      setScholarships(prev => prev.map(s => s.id === id ? { ...s, isNew: false } : s));
+      setInternships(prev => prev.map(i => i.id === id ? { ...i, isNew: false } : i));
+    }
+  };
 
-  const displayScholarships = scholarships.filter(s => !dismissedNewIds.includes(s.id));
-  const displayInternships = internships.filter(i => !dismissedNewIds.includes(i.id));
+  const displayScholarships = scholarships;
+  const displayInternships = internships;
 
   const totalWonValue = wonScholarships.reduce((sum, s) => sum + (s.amountNumeric || 0), 0);
   const bookmarkedCount = bookmarked.length;
@@ -137,7 +200,10 @@ export default function App() {
   const handleSelectCollegeForCalc = (college: any) => { setSelectedCollege(college); setActiveTab("calculator"); };
 
   const addNotification = (title: string, message: string, type: "deadline" | "alert" | "system") => {
-    setNotifications(prev => [{ id: "n-" + Date.now(), title, message, timestamp: "Just now", isRead: false, type }, ...prev]);
+    const id = "n-" + Date.now();
+    const now = new Date().toISOString();
+    setNotifications(prev => [{ id, title, message, timestamp: now, isRead: false, type }, ...prev]);
+    setToasts(prev => [...prev, { id: "t-" + Date.now(), title, message, type }]);
   };
 
   const handleAiSearch = async () => {
@@ -181,6 +247,7 @@ export default function App() {
   return (
     <div className={`min-h-screen bg-background text-on-surface font-sans flex flex-col ${resolvedGradient !== "none" ? `bg-gradient-${resolvedGradient}` : ""} ${darkMode ? "dark" : ""}`}
       style={{ '--font-sans': "'Outfit', 'Roboto', ui-sans-serif, system-ui, sans-serif" } as React.CSSProperties}>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Top App Bar */}
       <header className="bg-surface border-b border-surface-dim m3-elevation-1" style={{ zIndex: 10 }}>
         <div className={`mx-auto px-4 h-16 flex items-center justify-between ${wideMode ? "max-w-full" : "max-w-6xl"}`}>
@@ -321,7 +388,7 @@ export default function App() {
                         }`}>
                         <div className="flex justify-between items-center mb-0.5">
                           <span className="font-medium text-xs">{n.title}</span>
-                          <span className="text-xs text-on-surface-variant">{n.timestamp}</span>
+                          <span className="text-xs text-on-surface-variant">{formatTimestamp(n.timestamp)}</span>
                         </div>
                         <p className="text-xs">{n.message}</p>
                       </div>

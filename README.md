@@ -1,112 +1,108 @@
-# Hackathon Starter Template
+# The Admissions Atlas
 
-Welcome! This template gives you a fully-configured cloud dev environment in about 1-2 minutes. No installs on your laptop, no "works on my machine." You just click a few buttons in the browser and you're coding.
+A full-stack scholarship, internship, and college admissions planning tool. Track opportunities, manage deadlines, calculate financial aid, and get AI-powered recommendations — all in one dashboard.
 
-## Getting started
+## Tech Stack
 
-1. **Click the green "Use this template" button** at the top of this repo, then **Create a new repository**. Give it any name — this is your hackathon project repo.
-2. Open the new repo you just created.
-3. Click the green **`<> Code`** button → **Codespaces** tab → **Create codespace on main**.
-4. Wait 1-2 minutes while it builds. You'll see a VS Code window in your browser when it's ready.
-5. Start building!
+- **Frontend:** Vite + React 19 + TypeScript + Tailwind CSS v4
+- **Backend:** Express server (port 3000) with Vite middleware in dev mode
+- **Database/Auth:** Supabase (anon key + service key)
+- **AI:** Google Gemini API for search, resume analysis, and college recommendations
+- **Icons:** Lucide React
+- **Animation:** Framer Motion (M3 theme)
 
-> **Tip:** If you'd rather use the desktop VS Code app, install the "GitHub Codespaces" extension and connect to your codespace from there.
+## Features
 
-## What's pre-installed
+- **Scholarships & Internships** — Browse, search, filter, bookmark, and mark as won with editable amounts. AI-powered search discovers new opportunities via Gemini.
+- **College Deadlines** — Track ED/RD deadlines, tuition, acceptance rates, and financial aid estimates. AI college recommender suggests matches and discovers new schools.
+- **Cost Calculator** — Net price projection with borrowing scenarios and repayment estimates.
+- **Resume Scanner** — Upload a PDF or TXT resume for AI-powered profile extraction and match scoring against scholarships/internships.
+- **Admin Panel** — User management, role promotion, data reset.
+- **Bookmarks & Won List** — Save favorites and track secured awards with persistence across sessions.
+- **Notifications & Alerts** — Toast notifications for bookmark/won toggles, deadline reminders within 7 days, and AI search results.
+- **Deadline Alerts** — Automatic checks every 30 minutes for opportunities closing within 7 days.
 
-| Tool | What it's for |
-| --- | --- |
-| Node.js 24 (LTS) | JavaScript / TypeScript runtime |
-| Python 3.12 | Python projects |
-| GitHub CLI (`gh`) | Talk to GitHub from the terminal |
-| opencode | AI coding assistant in your terminal |
-| Vercel CLI | Deploy frontends and serverless apps |
-| Netlify CLI | Deploy static sites and functions |
-| Wrangler | Deploy to Cloudflare Workers / Pages |
-| Railway CLI | Deploy full-stack apps with databases |
-| Neon CLI (`neonctl`) | Spin up serverless Postgres databases |
-| `uv` | Fast Python package + project manager (also installs other Python versions on demand) |
-| `httpie`, `jq`, `ripgrep`, `fd`, `tmux`, `tree` | Handy command-line utilities |
-| opencode VS Code extension | Launch opencode in the editor's integrated terminal |
-| Prettier, ESLint, Pylance, Tailwind extensions | Auto-formatting and language support in VS Code |
-| Markdown All in One | Better markdown editing and preview |
-| DotENV | Syntax highlighting for `.env` files |
-
-Format-on-save is already turned on — your code gets tidied every time you hit save.
-
-## Using opencode (terminal AI assistant)
-
-opencode is an AI coding agent that lives in your terminal. Open a terminal in VS Code (`` Ctrl+` ``) and run:
+## Getting Started
 
 ```bash
-opencode
+# Install dependencies
+npm install
+
+# Start the dev server (Express + Vite)
+npm run dev
 ```
 
-**It just works out of the box.** This template ships an `opencode.json` that defaults to `opencode/deepseek-v4-flash-free` — a free model served through opencode's hosted gateway, no API key needed. Start chatting immediately.
+Open http://localhost:3000 in your browser.
 
-The template also ships a few **skills** opencode auto-loads when relevant — including building good-looking UIs, deploying to Vercel without the usual env-var/domain footguns, and drawing architecture diagrams from your code. You don't have to invoke them; just describe what you want and opencode will pull in the right context.
+## Environment Variables
 
-### Want a different / more powerful model?
+Copy `.env.example` to `.env` and fill in:
 
-If your project gets serious and you want to switch to a paid model (Claude, GPT-4, DeepSeek V4 Pro, etc.), you have a few options:
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SUPABASE_URL` | Yes | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Yes | Supabase anonymous key (client-side) |
+| `SUPABASE_SERVICE_KEY` | Yes | Supabase service role key (server-side) |
+| `GEMINI_API_KEY` | No | Google Gemini API key — enables AI search, resume analysis, and college recommendations |
+| `ADMIN_SECRET_CODE` | No | Secret code to promote a user to admin (default: `ADMIN2026`) |
 
-**Use a shared org API key (if organizers set one up):** organizers can pre-provision an API key as an env var — opencode will pick it up automatically. Edit `opencode.json` to point at the model you want and the corresponding provider (e.g. `"model": "anthropic/claude-sonnet-4-5"`).
+## Project Structure
 
-**Bring your own key:**
+```
+├── server.ts                     # Express server with all API routes
+├── src/
+│   ├── App.tsx                   # Root — lazy-loads the M3 theme
+│   ├── main.tsx                  # React entry point
+│   ├── types.ts                  # Shared TypeScript interfaces
+│   ├── supabaseClient.ts         # Supabase client singleton
+│   ├── data/colleges.ts          # Static college data (14 schools)
+│   ├── components/               # Shared components (AdminPanel, ToastContainer)
+│   └── themes/
+│       ├── m3/                   # Material Design 3 theme
+│       │   ├── App.tsx
+│       │   └── components/       # Per-tab panels + AuthModal + ResumeScannerModal
+│       └── holo/                 # Android Holo theme (files preserved)
+│           ├── App.tsx
+│           └── components/
+└── vercel-deploy/                # Standalone Vercel deployment package
+    ├── api/index.ts              # Serverless Express function
+    ├── vercel.json
+    ├── migration.sql             # Supabase table schemas
+    └── public/                   # Built frontend assets
+```
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/scholarships` | List all scholarships |
+| POST | `/api/scholarships/update` | AI search and merge scholarships |
+| GET | `/api/internships` | List all internships |
+| POST | `/api/internships/update` | AI search and merge internships |
+| POST | `/api/analyze-resume` | Extract profile and score matches from resume text |
+| POST | `/api/colleges/recommend` | AI college recommendations with suggestions |
+| POST | `/api/auth/profile` | Get user role from Supabase |
+| POST | `/api/auth/upgrade-admin` | Promote user to admin |
+| POST | `/api/user/save-data` | Save user preferences/bookmarks/won to Supabase |
+| GET | `/api/user/load-data` | Load user preferences/bookmarks/won |
+| GET | `/api/admin/users` | List all users (admin) |
+| POST | `/api/admin/users/role` | Change user role (admin) |
+| POST | `/api/admin/promote-by-email` | Promote user by email (admin) |
+| POST | `/api/reset` | Reset data to defaults (admin) |
+
+## Deploying to Vercel
+
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...   # or OPENAI_API_KEY, etc.
+cd vercel-deploy
+npm run build:frontend   # Builds Vite app, copies into public/
+vercel deploy --prod
 ```
-Then edit `opencode.json`'s `"model"` field. To persist across terminal sessions, add it as a [Codespaces user secret](https://github.com/settings/codespaces).
 
-**Use a Claude or ChatGPT subscription:**
-```bash
-opencode auth login
-```
-Follow the browser prompt. This uses your subscription instead of pay-per-token API credits.
+Set environment variables in the Vercel Dashboard under Project → Settings → Environment Variables:
 
-## Where to deploy your project
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_KEY`
+- `GEMINI_API_KEY` (optional)
+- `ADMIN_SECRET_CODE` (optional)
 
-| Project type | Recommended host |
-| --- | --- |
-| Static site (HTML, plain React, Astro) | **Cloudflare Pages** (`wrangler pages deploy`) |
-| Frontend with API routes (Next.js, SvelteKit, Remix) | **Vercel** (`vercel`) or **Netlify** (`netlify deploy`) |
-| Full-stack app needing a database | **Railway** (`railway up`) — runs app + Postgres together |
-| Anything with a Dockerfile | **Railway** (`railway up`) |
-| Need just a Postgres database for your app | **Neon** (`neonctl projects create`) — pairs well with a Vercel/Netlify frontend |
-
-These CLIs are pre-installed. Each one walks you through login the first time you run it.
-
-## Sharing a preview URL during the hack
-
-Need to show your in-progress app to a teammate or judge?
-
-1. Run your dev server (e.g. `npm run dev`).
-2. In VS Code, open the **Ports** tab (bottom panel, next to Terminal).
-3. Find your port (3000, 5173, 8000, or 8080 — they're forwarded by default).
-4. **Right-click** the port → **Port Visibility** → **Public**.
-5. Copy the URL from the **Forwarded Address** column and share it.
-
-> The URL stops working when your codespace stops. Deploy to one of the hosts above for anything you want to keep alive.
-
-## Codespaces free-tier limits — important!
-
-GitHub gives each personal account a monthly Codespaces quota:
-
-- **Free plan:** 120 core-hours + 15 GB storage / month
-- **Pro / Student plan:** 180 core-hours + 20 GB storage / month
-
-A 2-core codespace burns 2 core-hours per real hour of use. A weekend hackathon won't blow through the hours — but storage is the silent killer.
-
-### **Delete your codespace after the event** (don't just stop it)
-
-A *stopped* codespace still eats your 15 GB storage quota. To actually free it up:
-
-1. Go to <https://github.com/codespaces>.
-2. Click the **`...`** menu next to your codespace.
-3. Click **Delete**.
-
-Push your code to GitHub first if you want to keep it!
-
-## Stuck?
-
-Most issues during the event will be auth-related — your AI tool or deploy CLI asking for credentials. Re-read the opencode section above, or ask an organizer. Happy hacking!
+Run `vercel-deploy/migration.sql` in your Supabase SQL Editor to create the required tables before deploying.

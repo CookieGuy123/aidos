@@ -153,7 +153,7 @@ export default function ScholarshipsPanel({ scholarships, setScholarships, isBoo
                 <td className="font-medium">
                   <div className="flex items-center gap-2">
                     {s.name}
-                    {s.isNew && <span className="m3-badge m3-badge-new">NEW</span>}
+                    {s.isNew && <span onClick={() => dismissNew(s.id)} className="m3-badge m3-badge-new cursor-pointer" title="Dismiss">NEW</span>}
                   </div>
                 </td>
                 <td className="text-right font-mono tabular-nums font-semibold">${(s.amountNumeric || 0).toLocaleString()}</td>

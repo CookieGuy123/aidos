@@ -243,6 +243,9 @@
 .theme-light [class*="bg-teal-950"] { background-color: #e6fffa !important; border-color: #9bf6e7 !important; color: #0d5a4e !important; }
 .theme-light [class*="text-teal-400"] { color: #0d5a4e !important; }
 
+/* Toast Animation */
+@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
 /* Holo Theme Animations */
 @keyframes pulseGlow { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.75; } }
 .holo-scanline { position: relative; }

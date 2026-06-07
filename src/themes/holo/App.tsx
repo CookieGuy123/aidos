@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Scholarship, Internship, College, BookmarkedOpportunity, NotificationItem, UserProfile } from "../../types";
 import ScholarshipsPanel from "./components/ScholarshipsPanel";
 import InternshipsPanel from "./components/InternshipsPanel";
@@ -8,7 +8,23 @@ import ProfilePanel from "./components/ProfilePanel";
 import AuthModal from "./components/AuthModal";
 import ResumeScannerModal from "./components/ResumeScannerModal";
 import AdminPanel from "./components/AdminPanel";
+import ToastContainer from "../../components/ToastContainer";
 import { supabase } from "../../supabaseClient";
+
+function formatTimestamp(ts: string): string {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts;
+  const diff = Date.now() - d.getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString();
+}
 import { 
   Trophy, Bookmark, Clock, Calendar, ShieldCheck, 
   Sparkles, RefreshCw, Layers, Bell, CheckSquare, 
@@ -81,6 +97,8 @@ export default function App() {
       type: "deadline"
     }
   ]);
+  const [toasts, setToasts] = useState<{ id: string; title: string; message: string; type: "deadline" | "alert" | "system" }[]>([]);
+  const dismissToast = useCallback((id: string) => setToasts(prev => prev.filter(t => t.id !== id)), []);
 
   // Auth State
   const [session, setSession] = useState<any>(null);
@@ -121,6 +139,30 @@ export default function App() {
       syncLocalDataToCloud(session.user.id);
     }
   }, [session]);
+
+  // Deadline alerts — check every 30 minutes, avoids duplicate alerts
+  const notifiedDeadlines = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!dataLoaded) return;
+    const checkDeadlines = () => {
+      const now = new Date();
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      const allItems = [...scholarships.map(s => ({ ...s, __type: "scholarship" as const })), ...internships.map(i => ({ ...i, __type: "internship" as const }))];
+      allItems.forEach(item => {
+        if (notifiedDeadlines.current.has(item.id)) return;
+        const deadline = new Date(item.deadline);
+        const diff = deadline.getTime() - now.getTime();
+        if (diff > 0 && diff <= sevenDays) {
+          notifiedDeadlines.current.add(item.id);
+          const daysLeft = Math.ceil(diff / (24 * 60 * 60 * 1000));
+          addPushNotification("Deadline Approaching", `"${item.name}" closes in ${daysLeft} day${daysLeft > 1 ? "s" : ""}!`, "deadline");
+        }
+      });
+    };
+    checkDeadlines();
+    const interval = setInterval(checkDeadlines, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [dataLoaded, scholarships, internships]);
 
   const syncAnonBookmarks = async (userId: string) => {
     const stored = localStorage.getItem("anon_bookmarks");
@@ -497,15 +539,17 @@ export default function App() {
 
   // Push Notifications API
   const addPushNotification = (title: string, message: string, type: "deadline" | "alert" | "system") => {
+    const now = new Date().toISOString();
     const newItem: NotificationItem = {
       id: `note-${Date.now()}`,
       title,
       message,
-      timestamp: "Just now",
+      timestamp: now,
       isRead: false,
       type
     };
     setNotifications(prev => [newItem, ...prev]);
+    setToasts(prev => [...prev, { id: "t-" + Date.now(), title, message, type }]);
 
     if (Notification.permission === "granted") {
       new Notification(`[Holo Academic] ${title}`, {
@@ -522,6 +566,7 @@ export default function App() {
   return (
     <div className={`min-h-screen bg-holo-black text-white font-sans flex flex-col selection:bg-holo-blue-dark selection:text-black ${theme === "light" ? "theme-light" : ""}`}
       style={{ '--font-sans': "'Roboto', 'Inter', ui-sans-serif, system-ui, sans-serif" } as React.CSSProperties}>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       
       {/* Android Action Bar */}
       <header className="h-14 flex items-center justify-between px-4 border-b border-holo-gray-border bg-holo-black shrink-0 relative">
@@ -904,7 +949,7 @@ export default function App() {
                                 >
                                   <div className="flex justify-between items-center mb-1">
                                     <span className="font-bold text-holo-blue-light uppercase text-xs tracking-wide select-none">&bull; {n.title}</span>
-                                    <span className="text-xs text-gray-500 font-normal">{n.timestamp}</span>
+                                    <span className="text-xs text-gray-500 font-normal">{formatTimestamp(n.timestamp)}</span>
                                   </div>
                                   <p className="leading-relaxed font-sans">{n.message}</p>
                                 </div>

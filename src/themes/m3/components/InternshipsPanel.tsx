@@ -148,7 +148,7 @@ export default function InternshipsPanel({ internships, setInternships, isBookma
                 <td className="font-medium">
                   <div className="flex items-center gap-2">
                     {i.title}
-                    {i.isNew && <span className="m3-badge m3-badge-new">NEW</span>}
+                    {i.isNew && <span onClick={() => dismissNew(i.id)} className="m3-badge m3-badge-new cursor-pointer" title="Dismiss">NEW</span>}
                   </div>
                 </td>
                 <td className="text-sm text-on-surface-variant">{i.location || "—"}</td>

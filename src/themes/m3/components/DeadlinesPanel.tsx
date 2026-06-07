@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { MapPin, Calendar, DollarSign, Percent, University, Plus, X, Search, Calculator } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { MapPin, Calendar, DollarSign, Percent, University, Plus, X, Search, Calculator, Sparkles, Loader2 } from "lucide-react";
 import { collegesData } from "../../../data/colleges";
+import { supabase } from "../../../supabaseClient";
 
 interface Props {
   onSelectCollege?: (college: any) => void;
@@ -19,9 +20,74 @@ export default function DeadlinesPanel({ onSelectCollege }: Props) {
   const [tierFilter, setTierFilter] = useState("all");
   const [customOpen, setCustomOpen] = useState(false);
   const [custom, setCustom] = useState({ name: "", location: "", acceptanceRate: "", tuitionSticker: "", avgAidPackage: "", deadlineED: "", deadlineRD: "" });
-  const [customColleges, setCustomColleges] = useState<any[]>([]);
+  const [customColleges, setCustomColleges] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem("aid_custom_colleges") || "[]"); } catch { return []; }
+  });
 
-  const allColleges = [...collegesData, ...customColleges].filter(c => {
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [recommendedIds, setRecommendedIds] = useState<string[]>([]);
+  const [suggestedColleges, setSuggestedColleges] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem("aid_suggested_colleges") || "[]"); } catch { return []; }
+  });
+
+  // Load colleges from Supabase on mount
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        fetch(`/api/user/load-data?userId=${session.user.id}`).then(r => r.json()).then(d => {
+          if (d.success) {
+            if (d.customColleges?.length) setCustomColleges(d.customColleges);
+            if (d.suggestedColleges?.length) setSuggestedColleges(d.suggestedColleges);
+          }
+        }).catch(() => {});
+      }
+    });
+  }, []);
+
+  // Debounced persist to localStorage and Supabase on change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      localStorage.setItem("aid_custom_colleges", JSON.stringify(customColleges));
+      localStorage.setItem("aid_suggested_colleges", JSON.stringify(suggestedColleges));
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          fetch("/api/user/save-data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: session.user.id, customColleges, suggestedColleges })
+          }).catch(() => {});
+        }
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [customColleges, suggestedColleges]);
+
+  const handleAiRecommend = async () => {
+    if (!aiQuery.trim()) return;
+    setAiLoading(true);
+    try {
+      const res = await fetch("/api/colleges/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ interests: aiQuery })
+      });
+      const data = await res.json();
+      setRecommendedIds(data.matches || []);
+      if (data.suggestions?.length) {
+        setSuggestedColleges(data.suggestions);
+      }
+    } catch { setRecommendedIds([]); }
+    finally { setAiLoading(false); }
+  };
+
+  const dismissRecommendation = (id: string) => {
+    setRecommendedIds(prev => prev.filter(i => i !== id));
+    setSuggestedColleges(prev => prev.map(c => c.id === id ? { ...c, dismissed: true } : c));
+  };
+
+  const allColleges = [...collegesData, ...customColleges, ...suggestedColleges].filter(c => {
     if (tierFilter !== "all" && c.tier !== tierFilter) return false;
     if (!search) return true;
     const q = search.toLowerCase();
@@ -63,6 +129,28 @@ export default function DeadlinesPanel({ onSelectCollege }: Props) {
         </div>
       </div>
 
+      {/* AI College Recommender */}
+      <div className="m3-card p-3 mb-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles className="w-4 h-4 text-primary" />
+          <span className="text-sm font-semibold text-on-surface">College Recommender</span>
+        </div>
+        <p className="text-xs text-on-surface-variant mb-2">Tell us your interests and we'll suggest colleges from the list.</p>
+        <div className="flex items-center gap-2">
+          <input value={aiQuery} onChange={e => setAiQuery(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleAiRecommend()}
+            className="m3-field flex-1" placeholder="e.g. I want to study engineering in California..." />
+          <button onClick={handleAiRecommend} disabled={aiLoading || !aiQuery.trim()}
+            className="m3-btn-filled text-sm px-4 py-2">
+            {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            Find
+          </button>
+        </div>
+        {(recommendedIds.length > 0 || suggestedColleges.length > 0) && (
+          <p className="text-xs text-success mt-2">{recommendedIds.length + suggestedColleges.length} college{(recommendedIds.length + suggestedColleges.length) > 1 ? "s" : ""} matched your interests. Click a highlighted card to dismiss.</p>
+        )}
+      </div>
+
       {customOpen && (
         <div className="m3-card p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
@@ -79,18 +167,28 @@ export default function DeadlinesPanel({ onSelectCollege }: Props) {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {allColleges.map(c => (
-          <div key={c.id} className="m3-card p-0 overflow-hidden">
+        {allColleges.map(c => {
+          const suggestion = suggestedColleges.find(s => s.id === c.id);
+          const isRecommended = recommendedIds.includes(c.id) || (suggestion && !suggestion.dismissed);
+          return (
+          <div key={c.id} onClick={isRecommended ? () => dismissRecommendation(c.id) : undefined}
+            className={`m3-card p-0 overflow-hidden transition-all duration-200 ${
+              isRecommended ? "ring-2 ring-primary bg-primary-container/10 cursor-pointer" : ""
+            }`}>
             <div className="p-4 pb-3">
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <University className="w-5 h-5 text-primary shrink-0" />
                   <h3 className="text-base font-semibold text-on-surface truncate">{c.name}</h3>
+                  {suggestion && !suggestion.dismissed && <span className="m3-badge m3-badge-new text-[10px]">AI SUGGESTED</span>}
                 </div>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ml-2 ${tierColors[c.tier] || "bg-surface-dim text-on-surface-variant"}`}>
                   {c.tier === "Ivy League" ? "Ivy" : c.tier === "Top Engineering" ? "ENG" : c.tier === "Top Public" ? "PUB" : c.tier === "Top Liberal Arts" ? "LA" : c.tier === "Specialized Health" ? "HLTH" : c.tier}
                 </span>
               </div>
+              {suggestion?.reason && !suggestion.dismissed && (
+                <p className="text-xs text-primary mb-2 italic">"{suggestion.reason}"</p>
+              )}
               {c.location && (
                 <div className="flex items-center gap-1.5 text-sm text-on-surface-variant mb-1.5">
                   <MapPin className="w-3.5 h-3.5" /> {c.location}
@@ -134,7 +232,8 @@ export default function DeadlinesPanel({ onSelectCollege }: Props) {
               )}
             </div>
           </div>
-        ))}
+        );
+        })}
         {allColleges.length === 0 && (
           <div className="col-span-full text-center text-sm text-on-surface-variant py-8 italic">No colleges match your filters</div>
         )}

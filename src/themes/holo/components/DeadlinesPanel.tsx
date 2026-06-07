@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { College } from "../../../types";
 import { collegesData } from "../../../data/colleges";
-import { Clock, DollarSign, Pin, Landmark, Code, GraduationCap, Palette, Stethoscope } from "lucide-react";
+import { supabase } from "../../../supabaseClient";
+import { Clock, DollarSign, Pin, Landmark, Code, GraduationCap, Palette, Stethoscope, Sparkles, Loader2 } from "lucide-react";
 
 interface DeadlinesPanelProps {
   onSelectCollegeForCalculator: (college: College) => void;
@@ -13,7 +14,71 @@ export default function DeadlinesPanel({ onSelectCollegeForCalculator }: Deadlin
   const [selectedSpecialty, setSelectedSpecialty] = useState<"all" | "Engineering" | "Health" | "Business" | "Arts" | "Humanities" | "General">("all");
   const [selectedPriceTier, setSelectedPriceTier] = useState<"all" | "high" | "low">("all");
 
-  const [colleges, setColleges] = useState<College[]>(collegesData);
+  const [colleges, setColleges] = useState<College[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("holo_custom_colleges") || "[]");
+      return saved.length ? saved : collegesData;
+    } catch { return collegesData; }
+  });
+
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [recommendedIds, setRecommendedIds] = useState<string[]>([]);
+  const [suggestedColleges, setSuggestedColleges] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem("holo_suggested_colleges") || "[]"); } catch { return []; }
+  });
+
+  // Load colleges from Supabase on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        fetch(`/api/user/load-data?userId=${session.user.id}`).then(r => r.json()).then(d => {
+          if (d.success) {
+            if (d.customColleges?.length) setColleges(d.customColleges);
+            if (d.suggestedColleges?.length) setSuggestedColleges(d.suggestedColleges);
+          }
+        }).catch(() => {});
+      }
+    });
+  }, []);
+
+  // Debounced persist to localStorage and Supabase on change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      localStorage.setItem("holo_custom_colleges", JSON.stringify(colleges));
+      localStorage.setItem("holo_suggested_colleges", JSON.stringify(suggestedColleges));
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          fetch("/api/user/save-data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: session.user.id, customColleges: colleges, suggestedColleges })
+          }).catch(() => {});
+        }
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [colleges, suggestedColleges]);
+
+  const handleAiRecommend = async () => {
+    if (!aiQuery.trim()) return;
+    setAiLoading(true);
+    try {
+      const res = await fetch("/api/colleges/recommend", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ interests: aiQuery })
+      });
+      const data = await res.json();
+      setRecommendedIds(data.matches || []);
+      if (data.suggestions?.length) setSuggestedColleges(data.suggestions);
+    } catch { setRecommendedIds([]); }
+    finally { setAiLoading(false); }
+  };
+
+  const dismissRecommendation = (id: string) => {
+    setRecommendedIds(prev => prev.filter(i => i !== id));
+    setSuggestedColleges(prev => prev.map(c => c.id === id ? { ...c, dismissed: true } : c));
+  };
 
   // Custom addition of university deadlines in app
   const [showAddForm, setShowAddForm] = useState(false);
@@ -51,7 +116,8 @@ export default function DeadlinesPanel({ onSelectCollegeForCalculator }: Deadlin
     setNewLocation("");
   };
 
-  const filteredColleges = colleges.filter(college => {
+  const allDisplayColleges = [...colleges, ...suggestedColleges];
+  const filteredColleges = allDisplayColleges.filter(college => {
     // Search match
     if (searchTerm && !college.name.toLowerCase().includes(searchTerm.toLowerCase()) && !college.location.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
@@ -159,6 +225,28 @@ export default function DeadlinesPanel({ onSelectCollegeForCalculator }: Deadlin
             {showAddForm ? "Close Form" : "Add Custom College"}
           </button>
         </div>
+      </div>
+
+      {/* AI College Recommender */}
+      <div className="bg-holo-gray-dark border border-holo-gray-border p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles className="w-4 h-4 text-holo-blue-light" />
+          <h3 className="text-xs font-mono text-holo-blue-light uppercase font-bold">College Recommender</h3>
+        </div>
+        <p className="text-xs text-gray-400 mb-2">Describe your interests and we'll highlight matching colleges below.</p>
+        <div className="flex items-center gap-2">
+          <input value={aiQuery} onChange={e => setAiQuery(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleAiRecommend()}
+            className="flex-1 bg-black text-gray-200 border border-holo-gray-border px-3 py-1.5 text-xs font-mono focus:border-holo-blue-light outline-none placeholder:text-gray-600"
+            placeholder="e.g. I want to study engineering in California..." />
+          <button onClick={handleAiRecommend} disabled={aiLoading || !aiQuery.trim()}
+            className="bg-holo-blue-dark text-black border border-holo-blue-light text-xs font-mono uppercase px-3 py-1.5 cursor-pointer disabled:opacity-40 hover:brightness-110 transition-all active:scale-95">
+            {aiLoading ? <Loader2 className="w-3 h-3 animate-spin inline" /> : "Find"}
+          </button>
+        </div>
+        {(recommendedIds.length > 0 || suggestedColleges.length > 0) && (
+          <p className="text-xs text-emerald-400 mt-2">{recommendedIds.length + suggestedColleges.length} college{(recommendedIds.length + suggestedColleges.length) > 1 ? "s" : ""} matched. Click a highlighted card to dismiss.</p>
+        )}
       </div>
 
       {/* Add Custom college timelines */}
@@ -286,10 +374,17 @@ export default function DeadlinesPanel({ onSelectCollegeForCalculator }: Deadlin
       {/* Colleges list */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredColleges.map(coll => {
+          const suggestion = suggestedColleges.find(s => s.id === coll.id);
+          const isRec = recommendedIds.includes(coll.id) || (suggestion && !suggestion.dismissed);
           return (
             <div
               key={coll.id}
-              className="bg-holo-gray-dark border border-holo-gray-border hover:border-holo-blue-dark/50 p-4 space-y-3 flex flex-col justify-between font-sans"
+              onClick={isRec ? () => dismissRecommendation(coll.id) : undefined}
+              className={`bg-holo-gray-dark border p-4 space-y-3 flex flex-col justify-between font-sans transition-all duration-200 ${
+                isRec
+                  ? "border-holo-blue-light/70 bg-gradient-to-r from-holo-blue-dim/20 to-transparent ring-1 ring-holo-blue-light/50 cursor-pointer"
+                  : "border-holo-gray-border hover:border-holo-blue-dark/50"
+              }`}
             >
               <div>
                 <div className="flex justify-between items-start gap-1">
@@ -297,8 +392,11 @@ export default function DeadlinesPanel({ onSelectCollegeForCalculator }: Deadlin
                     <span className="text-xs text-holo-blue-light uppercase tracking-wider block font-bold">
                       {coll.tier} &bull; {coll.specialization} FOCUS
                     </span>
-                    <h4 className="text-base font-bold text-gray-100 mt-1">{coll.name}</h4>
+                    <h4 className="text-base font-bold text-gray-100 mt-1">{coll.name}
+                      {suggestion && !suggestion.dismissed && <span className="ml-2 inline-block bg-holo-blue-light text-black text-[10px] font-bold px-1.5 py-0.5 uppercase tracking-wider">AI SUGGESTED</span>}
+                    </h4>
                     <span className="text-xs text-gray-400 block mt-0.5">{coll.location}</span>
+                    {suggestion?.reason && !suggestion.dismissed && <p className="text-xs text-holo-blue-light mt-1 italic">"{suggestion.reason}"</p>}
                   </div>
 
                   <span className="text-xs text-gray-400 border border-holo-gray-border px-2 py-0.5 bg-black rounded-sm">
