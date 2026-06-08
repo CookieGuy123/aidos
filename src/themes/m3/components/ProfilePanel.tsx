@@ -224,7 +224,7 @@ export default function ProfilePanel({ user, profile, setProfile, preferences, s
                     <p className="text-xs text-on-surface-variant">{s.organization}</p>
                   </div>
                   <span className="font-mono tabular-nums text-xs text-on-surface-variant shrink-0 ml-2">
-                    {new Date(s.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    {!s.deadline || s.deadline === "Rolling" || s.deadline === "Recurring" ? s.deadline || "—" : new Date(s.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </span>
                 </div>
               ))}
@@ -235,7 +235,7 @@ export default function ProfilePanel({ user, profile, setProfile, preferences, s
                     <p className="text-xs text-on-surface-variant">{i.company}</p>
                   </div>
                   <span className="font-mono tabular-nums text-xs text-on-surface-variant shrink-0 ml-2">
-                    {new Date(i.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    {!i.deadline || i.deadline === "Rolling" || i.deadline === "Recurring" ? i.deadline || "—" : new Date(i.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </span>
                 </div>
               ))}

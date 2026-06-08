@@ -86,12 +86,37 @@ export default function App() {
     if (!isLoading && !dataLoaded) {
       loadSavedData();
       setDataLoaded(true);
+      // Check if landing page requested resume scanner
+      if (localStorage.getItem("aid_open_scanner")) {
+        localStorage.removeItem("aid_open_scanner");
+        setScanOpen(true);
+      }
     }
   }, [isLoading, dataLoaded]);
 
+  // Strip isNew from items whose dismissal was already saved
   useEffect(() => {
-    if (dataLoaded && !user) saveLocalData();
+    if (!dataLoaded || dismissedNewIds.length === 0) return;
+    setScholarships(prev => prev.map(s => dismissedNewIds.includes(s.id) ? { ...s, isNew: false } : s));
+    setInternships(prev => prev.map(i => dismissedNewIds.includes(i.id) ? { ...i, isNew: false } : i));
+  }, [dataLoaded, dismissedNewIds]);
+
+  useEffect(() => {
+    if (dataLoaded) saveLocalData();
   }, [bookmarked, wonScholarships, wonInternships, dismissedNewIds, preferences, dataLoaded]);
+
+  // Cloud save for logged-in users
+  useEffect(() => {
+    if (!dataLoaded || !user) return;
+    saveDataToCloud();
+  }, [bookmarked, wonScholarships, wonInternships, dismissedNewIds, preferences, dataLoaded, user]);
+
+  // Re-trigger cloud load when user becomes available (fixes race with getSession)
+  useEffect(() => {
+    if (dataLoaded && user) {
+      loadDataFromCloud();
+    }
+  }, [dataLoaded, user]);
 
   // Deadline alerts — check every 30 minutes, avoids duplicate alerts
   const notifiedDeadlines = useRef<Set<string>>(new Set());
@@ -103,7 +128,9 @@ export default function App() {
       const allItems = [...scholarships.map(s => ({ ...s, __type: "scholarship" as const })), ...internships.map(i => ({ ...i, __type: "internship" as const }))];
       allItems.forEach(item => {
         if (notifiedDeadlines.current.has(item.id)) return;
+        if (!item.deadline || item.deadline === "Rolling" || item.deadline === "Recurring") return;
         const deadline = new Date(item.deadline);
+        if (isNaN(deadline.getTime())) return;
         const diff = deadline.getTime() - now.getTime();
         if (diff > 0 && diff <= sevenDays) {
           notifiedDeadlines.current.add(item.id);
@@ -139,6 +166,42 @@ export default function App() {
     } catch {}
   };
 
+  const saveDataToCloud = async () => {
+    if (!user) return;
+    try {
+      await fetch("/api/user/save-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          bookmarks: bookmarked,
+          wonScholarships: Object.fromEntries(wonScholarships.map(s => [s.id, s.amountNumeric || 0])),
+          dismissedNewIds,
+          preferences: { ...preferences, darkMode, wideMode, gradient: resolvedGradient },
+        })
+      });
+    } catch (e) {
+      console.error("Cloud save failed", e);
+    }
+  };
+
+  const loadDataFromCloud = async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`/api/user/load-data?userId=${user.id}`);
+      const data = await res.json();
+      if (data.success) {
+        if (data.bookmarks?.length) setBookmarked(data.bookmarks);
+        if (data.dismissedNewIds?.length) setDismissedNewIds(data.dismissedNewIds);
+        if (data.preferences) {
+          setPreferences((p: UserPreferences) => ({ ...p, ...data.preferences }));
+        }
+      }
+    } catch (e) {
+      console.error("Cloud load failed", e);
+    }
+  };
+
   const loadSavedData = () => {
     try {
       const b = localStorage.getItem("aid_bookmarked");
@@ -152,6 +215,8 @@ export default function App() {
       if (dn) setDismissedNewIds(JSON.parse(dn));
       if (pr) setPreferences((p: UserPreferences) => ({ ...p, ...JSON.parse(pr) }));
     } catch {}
+    // Also load from cloud for logged-in users
+    loadDataFromCloud();
   };
 
   const isBookmarked = (id: string) => bookmarked.some(b => b.id === id);
@@ -213,32 +278,37 @@ export default function App() {
       const endpoint = aiSearchType === "scholarships" ? "/api/scholarships/update" : "/api/internships/update";
       const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ searchQuery: aiSearchQuery }) });
       const data = await res.json();
-      if (data.success) {
-        if (aiSearchType === "scholarships" && data.scholarships) {
-          setScholarships(prev => {
-            const existing = new Set(prev.map(s => s.id));
-            const merged = data.scholarships.filter((s: Scholarship) => !existing.has(s.id)).map((s: Scholarship) => ({ ...s, isNew: true }));
-            return [...merged, ...prev];
-          });
-        } else if (aiSearchType === "internships" && data.internships) {
-          setInternships(prev => {
-            const existing = new Set(prev.map(i => i.id));
-            const merged = data.internships.filter((i: Internship) => !existing.has(i.id)).map((i: Internship) => ({ ...i, isNew: true }));
-            return [...merged, ...prev];
-          });
-        }
-        addNotification("AI Search Complete", `Found new ${aiSearchType} for "${aiSearchQuery}"`, "system");
-        setAiSearchOpen(false);
-        setAiSearchQuery("");
+
+      if (aiSearchType === "scholarships" && data.scholarships) {
+        setScholarships(prev => {
+          const existing = new Set(prev.map(s => s.id));
+          const merged = data.scholarships.filter((s: Scholarship) => !existing.has(s.id)).map((s: Scholarship) => ({ ...s, isNew: true }));
+          return [...merged, ...prev];
+        });
+      } else if (aiSearchType === "internships" && data.internships) {
+        setInternships(prev => {
+          const existing = new Set(prev.map(i => i.id));
+          const merged = data.internships.filter((i: Internship) => !existing.has(i.id)).map((i: Internship) => ({ ...i, isNew: true }));
+          return [...merged, ...prev];
+        });
       }
-    } catch {} finally { setAiSearchLoading(false); }
+
+      if (data.success) {
+        addNotification("AI Search Complete", `Found new ${aiSearchType} for "${aiSearchQuery}"`, "system");
+      } else {
+        addNotification("AI Search", data.error || "No new results found. Try a different query.", "system");
+      }
+      setAiSearchOpen(false);
+      setAiSearchQuery("");
+    } catch { addNotification("AI Search", "Search failed. Check your connection.", "alert"); }
+    finally { setAiSearchLoading(false); }
   };
 
   const tabs = [
     { id: "overview", label: "Home", icon: Home },
     { id: "scholarships", label: "Scholarships", icon: School, count: displayScholarships.length },
     { id: "internships", label: "Internships", icon: Briefcase, count: displayInternships.length },
-    { id: "deadlines", label: "Deadlines", icon: Calendar },
+    ...(preferences.studentLevel !== "college" ? [{ id: "deadlines", label: "Deadlines", icon: Calendar }] : []),
     { id: "calculator", label: "Costs", icon: Calculator },
     { id: "profile", label: "Profile", icon: User },
     ...(user?.user_metadata?.role === "admin" ? [{ id: "admin", label: "Admin", icon: ShieldCheck }] : []),
@@ -320,6 +390,15 @@ export default function App() {
                 <p className="text-sm text-on-primary-container/80 mt-1 max-w-lg">
                   Your central hub for scholarships, internships, college deadlines, and financial aid planning.
                 </p>
+                <div className="mt-3 flex items-center gap-3">
+                  <button onClick={() => setScanOpen(true)}
+                    className="m3-btn-filled text-sm inline-flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-xl hover:brightness-110 transition-all">
+                    <Upload className="w-4 h-4" /> Upload Resume
+                  </button>
+                  <span className="text-xs text-on-primary-container/70 max-w-xs">
+                    AI extracts your profile from a .pdf or .txt resume and finds your best matching scholarships and internships.
+                  </span>
+                </div>
               </div>
               <div className="grid grid-cols-4 gap-3">
                 <div className="m3-stat">
@@ -346,7 +425,7 @@ export default function App() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <ShortcutCard icon={Trophy} label="Scholarship Search" desc="Search AI-powered records, filter, and bookmark." color="text-primary" onClick={() => setActiveTab("scholarships")} />
                 <ShortcutCard icon={Layers} label="Internship Finder" desc="Browse positions, verify listings, flag scams." color="text-secondary" onClick={() => setActiveTab("internships")} />
-                <ShortcutCard icon={Calendar} label="College Deadlines" desc="Track ED/RD cycles, tuition, and acceptance rates." color="text-tertiary" onClick={() => setActiveTab("deadlines")} />
+                {preferences.studentLevel !== "college" && <ShortcutCard icon={Calendar} label="College Deadlines" desc="Track ED/RD cycles, tuition, and acceptance rates." color="text-tertiary" onClick={() => setActiveTab("deadlines")} />}
                 <ShortcutCard icon={DollarSign} label="Cost Calculator" desc="Project net costs and model borrowing scenarios." color="text-primary" onClick={() => setActiveTab("calculator")} />
               </div>
             </div>

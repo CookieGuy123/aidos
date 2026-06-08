@@ -16,8 +16,10 @@ interface Props {
 }
 
 function fmtDate(dateStr: string): string {
+  if (!dateStr || dateStr === "Rolling" || dateStr === "Recurring" || dateStr === "None") return dateStr || "—";
   const [y, m, d] = dateStr.split("-");
   const date = new Date(+y, +m - 1, +d);
+  if (isNaN(date.getTime())) return dateStr;
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
 }
 
